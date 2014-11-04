@@ -26,10 +26,8 @@ protected:
     }
 
     void make_bitmap() {
-        fBitmap.setConfig(SkBitmap::kARGB_8888_Config, 135, 135);
-        fBitmap.allocPixels();
-        SkBitmapDevice device(fBitmap);
-        SkCanvas canvas(&device);
+        fBitmap.allocN32Pixels(135, 135);
+        SkCanvas canvas(fBitmap);
         canvas.clear(0x0);
         SkPaint paint;
         paint.setAntiAlias(true);
@@ -42,7 +40,7 @@ protected:
     }
 
     virtual SkISize onISize() {
-        return make_isize(WIDTH, HEIGHT);
+        return SkISize::Make(WIDTH, HEIGHT);
     }
 
     void drawClippedBitmap(SkCanvas* canvas, const SkPaint& paint, int x, int y) {
@@ -76,13 +74,13 @@ protected:
             for (unsigned i = 0; i < SK_ARRAY_COUNT(samples); ++i) {
                 const SkImageFilter::CropRect* cr = j & 0x02 ? &cropRect : NULL;
                 if (j & 0x01) {
-                    paint.setImageFilter(new SkErodeImageFilter(
+                    paint.setImageFilter(SkErodeImageFilter::Create(
                         samples[i].fRadiusX,
                         samples[i].fRadiusY,
                         NULL,
                         cr))->unref();
                 } else {
-                    paint.setImageFilter(new SkDilateImageFilter(
+                    paint.setImageFilter(SkDilateImageFilter::Create(
                         samples[i].fRadiusX,
                         samples[i].fRadiusY,
                         NULL,

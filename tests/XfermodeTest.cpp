@@ -5,14 +5,9 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
-#include "TestClassDef.h"
 #include "SkColor.h"
 #include "SkXfermode.h"
-
-static SkPMColor bogusXfermodeProc(SkPMColor src, SkPMColor dst) {
-    return 42;
-}
+#include "Test.h"
 
 #define ILLEGAL_MODE    ((SkXfermode::Mode)-1)
 
@@ -37,14 +32,6 @@ static void test_asMode(skiatest::Reporter* reporter) {
             REPORTER_ASSERT(reporter, SkXfermode::kSrcOver_Mode == mode);
         }
     }
-
-    SkXfermode* bogusXfer = new SkProcXfermode(bogusXfermodeProc);
-    SkXfermode::Mode reportedMode = ILLEGAL_MODE;
-    REPORTER_ASSERT(reporter, !bogusXfer->asMode(&reportedMode));
-    REPORTER_ASSERT(reporter, reportedMode == ILLEGAL_MODE);
-    REPORTER_ASSERT(reporter, !SkXfermode::AsMode(bogusXfer, &reportedMode));
-    REPORTER_ASSERT(reporter, reportedMode == ILLEGAL_MODE);
-    bogusXfer->unref();
 }
 
 static void test_IsMode(skiatest::Reporter* reporter) {

@@ -63,7 +63,7 @@ static void testPathOpsRectsMain(PathOpsThreadState* data)
             if (progress) {
                 outputProgress(state.fPathStr, pathStr, (SkPathOp) op);
             }
-            testThreadedPathOp(state.fReporter, pathA, pathB, (SkPathOp) op);
+            testThreadedPathOp(state.fReporter, pathA, pathB, (SkPathOp) op, "rects");
         }
     }
                     }
@@ -73,7 +73,7 @@ static void testPathOpsRectsMain(PathOpsThreadState* data)
     }
 }
 
-static void PathOpsRectsThreadedTest(skiatest::Reporter* reporter) {
+DEF_TEST(PathOpsRectsThreaded, reporter) {
     int threadCount = initializeTests(reporter, "testOp");
     PathOpsThreadedTestRunner testRunner(reporter, threadCount);
     for (int a = 0; a < 6; ++a) {  // outermost
@@ -90,6 +90,3 @@ static void PathOpsRectsThreadedTest(skiatest::Reporter* reporter) {
 finish:
     testRunner.render();
 }
-
-#include "TestClassDef.h"
-DEFINE_TESTCLASS_SHORT(PathOpsRectsThreadedTest)

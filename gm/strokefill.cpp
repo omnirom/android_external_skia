@@ -19,12 +19,16 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() {
         return SkString("stroke-fill");
     }
 
     virtual SkISize onISize() {
-        return make_isize(640, 480);
+        return SkISize::Make(640, 480);
     }
 
     static void show_bold(SkCanvas* canvas, const void* text, int len,

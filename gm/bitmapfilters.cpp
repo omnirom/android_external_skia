@@ -1,11 +1,12 @@
-
 /*
  * Copyright 2011 Google Inc.
  *
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
+
 #include "gm.h"
+#include "sk_tool_utils.h"
 
 namespace skiagm {
 
@@ -20,8 +21,9 @@ static void make_bm(SkBitmap* bm) {
     }
     SkColorTable* ctable = new SkColorTable(colorsPM, 4);
 
-    bm->setConfig(SkBitmap::kIndex8_Config, 2, 2);
-    bm->allocPixels(ctable);
+    bm->allocPixels(SkImageInfo::Make(2, 2, kIndex_8_SkColorType,
+                                      kPremul_SkAlphaType),
+                    NULL, ctable);
     ctable->unref();
 
     *bm->getAddr8(0, 0) = 0;
@@ -45,15 +47,6 @@ static SkScalar draw_set(SkCanvas* c, const SkBitmap& bm, SkScalar x,
     return x + draw_bm(c, bm, x, 0, p);
 }
 
-static const char* gConfigNames[] = {
-    "unknown config",
-    "A8",
-    "Index8",
-    "565",
-    "4444",
-    "8888"
-};
-
 static SkScalar draw_row(SkCanvas* canvas, const SkBitmap& bm) {
     SkAutoCanvasRestore acr(canvas, true);
 
@@ -62,7 +55,7 @@ static SkScalar draw_row(SkCanvas* canvas, const SkBitmap& bm) {
     const int scale = 32;
 
     paint.setAntiAlias(true);
-    const char* name = gConfigNames[bm.config()];
+    const char* name = sk_tool_utils::colortype_name(bm.colorType());
     canvas->drawText(name, strlen(name), x, SkIntToScalar(bm.height())*scale*5/8,
                      paint);
     canvas->translate(SkIntToScalar(48), 0);
@@ -84,9 +77,9 @@ class FilterGM : public GM {
         }
         fOnce = true;
         make_bm(&fBM8);
-        fBM8.copyTo(&fBM4444, SkBitmap::kARGB_4444_Config);
-        fBM8.copyTo(&fBM16, SkBitmap::kRGB_565_Config);
-        fBM8.copyTo(&fBM32, SkBitmap::kARGB_8888_Config);
+        fBM8.copyTo(&fBM4444, kARGB_4444_SkColorType);
+        fBM8.copyTo(&fBM16, kRGB_565_SkColorType);
+        fBM8.copyTo(&fBM32, kN32_SkColorType);
     }
 public:
     SkBitmap    fBM8, fBM4444, fBM16, fBM32;
@@ -101,7 +94,7 @@ protected:
     }
 
     virtual SkISize onISize() {
-        return make_isize(540, 330);
+        return SkISize::Make(540, 330);
     }
 
     virtual void onDraw(SkCanvas* canvas) {

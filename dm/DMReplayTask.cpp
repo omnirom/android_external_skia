@@ -2,6 +2,7 @@
 #include "DMWriteTask.h"
 #include "DMUtil.h"
 
+#include "SkBBHFactory.h"
 #include "SkCommandLineFlags.h"
 #include "SkPicture.h"
 
@@ -13,22 +14,24 @@ namespace DM {
 ReplayTask::ReplayTask(const Task& parent,
                        skiagm::GM* gm,
                        SkBitmap reference,
-                       bool useRTree)
-    : Task(parent)
-    , fName(UnderJoin(parent.name().c_str(), useRTree ? "rtree" : "replay"))
+                       Mode mode)
+    : CpuTask(parent)
+    , fUseRTree(mode == kRTree_Mode)
+    , fName(UnderJoin(parent.name().c_str(), fUseRTree ? "rtree" : "replay"))
     , fGM(gm)
     , fReference(reference)
-    , fUseRTree(useRTree)
     {}
 
 void ReplayTask::draw() {
-    SkPicture recorded;
-    const uint32_t flags = fUseRTree ? SkPicture::kOptimizeForClippedPlayback_RecordingFlag : 0;
-    RecordPicture(fGM.get(), &recorded, flags);
+    SkAutoTDelete<SkBBHFactory> factory;
+    if (fUseRTree) {
+        factory.reset(SkNEW(SkRTreeFactory));
+    }
+    SkAutoTUnref<SkPicture> recorded(RecordPicture(fGM.get(), 0, factory.get()));
 
     SkBitmap bitmap;
-    SetupBitmap(fReference.config(), fGM.get(), &bitmap);
-    DrawPicture(&recorded, &bitmap);
+    AllocatePixels(fReference, &bitmap);
+    DrawPicture(recorded, &bitmap);
     if (!BitmapsEqual(bitmap, fReference)) {
         this->fail();
         this->spawnChild(SkNEW_ARGS(WriteTask, (*this, bitmap)));

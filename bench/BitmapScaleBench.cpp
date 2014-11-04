@@ -5,15 +5,15 @@
  * found in the LICENSE file.
  */
 
-#include "SkBenchmark.h"
+#include "Benchmark.h"
+#include "SkBlurMask.h"
 #include "SkCanvas.h"
 #include "SkPaint.h"
 #include "SkRandom.h"
 #include "SkShader.h"
 #include "SkString.h"
-#include "SkBlurMask.h"
 
-class BitmapScaleBench: public SkBenchmark {
+class BitmapScaleBench: public Benchmark {
     int         fLoopCount;
     int         fInputSize;
     int         fOutputSize;
@@ -57,14 +57,10 @@ protected:
     }
 
     virtual void onPreDraw() {
-        fInputBitmap.setConfig(SkBitmap::kARGB_8888_Config,
-                               fInputSize, fInputSize, 0, kOpaque_SkAlphaType);
-        fInputBitmap.allocPixels();
+        fInputBitmap.allocN32Pixels(fInputSize, fInputSize, true);
         fInputBitmap.eraseColor(SK_ColorWHITE);
 
-        fOutputBitmap.setConfig(SkBitmap::kARGB_8888_Config,
-                                fOutputSize, fOutputSize, 0, kOpaque_SkAlphaType);
-        fOutputBitmap.allocPixels();
+        fOutputBitmap.allocN32Pixels(fOutputSize, fOutputSize, true);
 
         fMatrix.setScale( scale(), scale() );
     }
@@ -83,7 +79,7 @@ protected:
     virtual void doScaleImage() = 0;
     virtual void preBenchSetup() {}
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 class BitmapFilterScaleBench: public BitmapScaleBench {
@@ -97,6 +93,7 @@ protected:
         SkPaint paint;
 
         paint.setFilterLevel(SkPaint::kHigh_FilterLevel);
+        fInputBitmap.notifyPixelsChanged();
         canvas.drawBitmapMatrix( fInputBitmap, fMatrix, &paint );
     }
 private:

@@ -6,16 +6,16 @@
  * found in the LICENSE file.
  */
 
-#if SK_SUPPORT_GPU
-#include "GrRenderTarget.h"
-#endif
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkDeferredCanvas.h"
 #include "SkDevice.h"
 #include "SkImage.h"
 #include "SkSurface.h"
+#if SK_SUPPORT_GPU
+#include "GrRenderTarget.h"
+#endif
 
-class DeferredSurfaceCopyBench : public SkBenchmark {
+class DeferredSurfaceCopyBench : public Benchmark {
     enum {
         kSurfaceWidth = 1000,
         kSurfaceHeight = 1000,
@@ -37,7 +37,7 @@ protected:
         SkImageInfo info;
         info.fWidth = kSurfaceWidth;
         info.fHeight = kSurfaceHeight;
-        info.fColorType = kPMColor_SkColorType;
+        info.fColorType = kN32_SkColorType;
         info.fAlphaType = kPremul_SkAlphaType;
         const SkRect fullCanvasRect = SkRect::MakeWH(
             SkIntToScalar(kSurfaceWidth), SkIntToScalar(kSurfaceHeight));
@@ -73,7 +73,7 @@ protected:
 private:
     bool fDiscardableContents;
 
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 //////////////////////////////////////////////////////////////////////////////

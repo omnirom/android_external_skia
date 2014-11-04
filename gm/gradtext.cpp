@@ -44,7 +44,7 @@ public:
 protected:
 
     virtual SkString onShortName() { return SkString("chrome_gradtext1"); }
-    virtual SkISize onISize() { return make_isize(500, 480); }
+    virtual SkISize onISize() { return SkISize::Make(500, 480); }
     virtual void onDraw(SkCanvas* canvas) {
         SkPaint paint;
         SkRect r = SkRect::MakeWH(SkIntToScalar(100), SkIntToScalar(100));
@@ -72,7 +72,7 @@ public:
 protected:
 
     virtual SkString onShortName() { return SkString("chrome_gradtext2"); }
-    virtual SkISize onISize() { return make_isize(500, 480); }
+    virtual SkISize onISize() { return SkISize::Make(500, 480); }
     virtual void onDraw(SkCanvas* canvas) {
         SkPaint paint;
 
@@ -100,12 +100,16 @@ public:
     GradTextGM () {}
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
 
     virtual SkString onShortName() {
         return SkString("gradtext");
     }
 
-    virtual SkISize onISize() { return make_isize(500, 480); }
+    virtual SkISize onISize() { return SkISize::Make(500, 480); }
 
     static void draw_text(SkCanvas* canvas, const SkPaint& paint) {
         const char* text = "When in the course of human events";

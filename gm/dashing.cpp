@@ -11,7 +11,8 @@
 #include "SkDashPathEffect.h"
 
 static void drawline(SkCanvas* canvas, int on, int off, const SkPaint& paint,
-                     SkScalar finalX = SkIntToScalar(600)) {
+                     SkScalar finalX = SkIntToScalar(600), SkScalar finalY = SkIntToScalar(0),
+                     SkScalar phase = SkIntToScalar(0)) {
     SkPaint p(paint);
 
     const SkScalar intervals[] = {
@@ -19,8 +20,8 @@ static void drawline(SkCanvas* canvas, int on, int off, const SkPaint& paint,
         SkIntToScalar(off),
     };
 
-    p.setPathEffect(new SkDashPathEffect(intervals, 2, 0))->unref();
-    canvas->drawLine(0, 0, finalX, 0, p);
+    p.setPathEffect(SkDashPathEffect::Create(intervals, 2, phase))->unref();
+    canvas->drawLine(0, 0, finalX, finalY, p);
 }
 
 // earlier bug stopped us from drawing very long single-segment dashes, because
@@ -37,11 +38,15 @@ public:
     DashingGM() {}
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     SkString onShortName() {
         return SkString("dashing");
     }
 
-    SkISize onISize() { return skiagm::make_isize(640, 300); }
+    SkISize onISize() { return SkISize::Make(640, 300); }
 
     virtual void onDraw(SkCanvas* canvas) {
         static const struct {
@@ -57,7 +62,6 @@ protected:
 
         canvas->translate(SkIntToScalar(20), SkIntToScalar(20));
         canvas->translate(0, SK_ScalarHalf);
-
         for (int width = 0; width <= 2; ++width) {
             for (size_t data = 0; data < SK_ARRAY_COUNT(gData); ++data) {
                 for (int aa = 0; aa <= 1; ++aa) {
@@ -119,11 +123,15 @@ public:
     Dashing2GM() {}
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     SkString onShortName() {
         return SkString("dashing2");
     }
 
-    SkISize onISize() { return skiagm::make_isize(640, 480); }
+    SkISize onISize() { return SkISize::Make(640, 480); }
 
     virtual void onDraw(SkCanvas* canvas) {
         static const int gIntervals[] = {
@@ -155,7 +163,7 @@ protected:
                 vals[i] = SkIntToScalar(*intervals++);
             }
             SkScalar phase = vals[0] / 2;
-            paint.setPathEffect(new SkDashPathEffect(vals, count, phase))->unref();
+            paint.setPathEffect(SkDashPathEffect::Create(vals, count, phase))->unref();
 
             for (size_t x = 0; x < SK_ARRAY_COUNT(gProc); ++x) {
                 SkPath path;
@@ -177,11 +185,15 @@ public:
     Dashing3GM() {}
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     SkString onShortName() {
         return SkString("dashing3");
     }
 
-    SkISize onISize() { return skiagm::make_isize(640, 480); }
+    SkISize onISize() { return SkISize::Make(640, 480); }
 
     // Draw a 100x100 block of dashed lines. The horizontal ones are BW
     // while the vertical ones are AA.
@@ -202,7 +214,7 @@ protected:
 
         SkScalar intervals[2] = { dashLength, dashLength };
 
-        p.setPathEffect(new SkDashPathEffect(intervals, 2, phase, false))->unref();
+        p.setPathEffect(SkDashPathEffect::Create(intervals, 2, phase))->unref();
 
         SkPoint pts[2];
 
@@ -301,10 +313,95 @@ protected:
 
 //////////////////////////////////////////////////////////////////////////////
 
+class Dashing4GM : public skiagm::GM {
+public:
+    Dashing4GM() {}
+
+protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
+    SkString onShortName() {
+        return SkString("dashing4");
+    }
+
+    SkISize onISize() { return SkISize::Make(640, 950); }
+
+    virtual void onDraw(SkCanvas* canvas) {
+        static const struct {
+            int fOnInterval;
+            int fOffInterval;
+        } gData[] = {
+            { 1, 1 },
+            { 4, 2 },
+            { 0, 4 }, // test for zero length on interval
+        };
+
+        SkPaint paint;
+        paint.setStyle(SkPaint::kStroke_Style);
+
+        canvas->translate(SkIntToScalar(20), SkIntToScalar(20));
+        canvas->translate(0, SK_ScalarHalf);
+
+        for (int width = 0; width <= 2; ++width) {
+            for (size_t data = 0; data < SK_ARRAY_COUNT(gData); ++data) {
+                for (int aa = 0; aa <= 1; ++aa) {
+                    for (int cap = 0; cap <= 1; ++cap) {
+                        int w = width * width * width;
+                        paint.setAntiAlias(SkToBool(aa));
+                        paint.setStrokeWidth(SkIntToScalar(w));
+
+                        SkToBool(cap) ? paint.setStrokeCap(SkPaint::kSquare_Cap)
+                            : paint.setStrokeCap(SkPaint::kRound_Cap);
+
+                        int scale = w ? w : 1;
+
+                        drawline(canvas, gData[data].fOnInterval * scale,
+                                 gData[data].fOffInterval * scale,
+                                 paint);
+                        canvas->translate(0, SkIntToScalar(20));
+                    }
+                }
+            }
+        }
+
+        for (int aa = 0; aa <= 1; ++aa) {
+            paint.setAntiAlias(SkToBool(aa));
+            paint.setStrokeWidth(8.f);
+            paint.setStrokeCap(SkPaint::kSquare_Cap);
+            // Single dash element that is cut off at start and end
+            drawline(canvas, 32, 16, paint, 20.f, 0, 5.f);
+            canvas->translate(0, SkIntToScalar(20));
+
+            // Two dash elements where each one is cut off at beginning and end respectively
+            drawline(canvas, 32, 16, paint, 56.f, 0, 5.f);
+            canvas->translate(0, SkIntToScalar(20));
+
+            // Many dash elements where first and last are cut off at beginning and end respectively
+            drawline(canvas, 32, 16, paint, 584.f, 0, 5.f);
+            canvas->translate(0, SkIntToScalar(20));
+
+            // Diagonal dash line where src pnts are not axis aligned (as apposed to being diagonal from
+            // a canvas rotation)
+            drawline(canvas, 32, 16, paint, 600.f, 30.f);
+            canvas->translate(0, SkIntToScalar(20));
+
+            // Case where only the off interval exists on the line. Thus nothing should be drawn
+            drawline(canvas, 32, 16, paint, 8.f, 0.f, 40.f);
+            canvas->translate(0, SkIntToScalar(20));
+        }
+    }
+};
+
+//////////////////////////////////////////////////////////////////////////////
+
 static skiagm::GM* F0(void*) { return new DashingGM; }
 static skiagm::GM* F1(void*) { return new Dashing2GM; }
 static skiagm::GM* F2(void*) { return new Dashing3GM; }
+static skiagm::GM* F3(void*) { return new Dashing4GM; }
 
 static skiagm::GMRegistry gR0(F0);
 static skiagm::GMRegistry gR1(F1);
 static skiagm::GMRegistry gR2(F2);
+static skiagm::GMRegistry gR3(F3);

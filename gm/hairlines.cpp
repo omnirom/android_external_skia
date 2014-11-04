@@ -13,12 +13,16 @@ namespace skiagm {
 
 class HairlinesGM : public GM {
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
 
     virtual SkString onShortName() SK_OVERRIDE {
         return SkString("hairlines");
     }
 
-    virtual SkISize onISize() { return make_isize(800, 600); }
+    virtual SkISize onISize() { return SkISize::Make(800, 600); }
 
     virtual void onOnceBeforeDraw() SK_OVERRIDE {
         {

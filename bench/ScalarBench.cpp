@@ -5,13 +5,13 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkFloatBits.h"
 #include "SkRandom.h"
 #include "SkRect.h"
 #include "SkString.h"
 
-class ScalarBench : public SkBenchmark {
+class ScalarBench : public Benchmark {
     SkString    fName;
 public:
     ScalarBench(const char name[])  {
@@ -38,20 +38,8 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
-
-// we want to stop the compiler from eliminating code that it thinks is a no-op
-// so we have a non-static global we increment, hoping that will convince the
-// compiler to execute everything
-int gScalarBench_NonStaticGlobal;
-
-#define always_do(pred)                     \
-    do {                                    \
-        if (pred) {                         \
-            ++gScalarBench_NonStaticGlobal; \
-        }                                   \
-    } while (0)
 
 // having unknown values in our arrays can throw off the timing a lot, perhaps
 // handling NaN values is a lot slower. Anyway, this guy is just meant to put
@@ -71,8 +59,10 @@ public:
 protected:
     virtual int mulLoopCount() const { return 4; }
     virtual void performTest() {
-        always_do(fArray[6] != 0.0f || fArray[7] != 0.0f || fArray[8] != 1.0f);
-        always_do(fArray[2] != 0.0f || fArray[5] != 0.0f);
+        // xoring into a volatile prevents the compiler from optimizing these checks away.
+        volatile bool junk = false;
+        junk ^= (fArray[6] != 0.0f || fArray[7] != 0.0f || fArray[8] != 1.0f);
+        junk ^= (fArray[2] != 0.0f || fArray[5] != 0.0f);
     }
 private:
     float fArray[9];
@@ -88,11 +78,13 @@ public:
 protected:
     virtual int mulLoopCount() const { return 4; }
     virtual void performTest() {
-        always_do(SkScalarAs2sCompliment(fArray[6]) |
-                  SkScalarAs2sCompliment(fArray[7]) |
-                  (SkScalarAs2sCompliment(fArray[8]) - kPersp1Int));
-        always_do(SkScalarAs2sCompliment(fArray[2]) |
-                  SkScalarAs2sCompliment(fArray[5]));
+        // xoring into a volatile prevents the compiler from optimizing these checks away.
+        volatile int32_t junk = 0;
+        junk ^= (SkScalarAs2sCompliment(fArray[6]) |
+                 SkScalarAs2sCompliment(fArray[7]) |
+                (SkScalarAs2sCompliment(fArray[8]) - kPersp1Int));
+        junk ^= (SkScalarAs2sCompliment(fArray[2]) |
+                 SkScalarAs2sCompliment(fArray[5]));
     }
 private:
     static const int32_t kPersp1Int = 0x3f800000;
@@ -133,7 +125,7 @@ private:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class RectBoundsBench : public SkBenchmark {
+class RectBoundsBench : public Benchmark {
     enum {
         PTS = 100,
     };
@@ -165,7 +157,7 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

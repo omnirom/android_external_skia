@@ -8,6 +8,7 @@
 #include "gm.h"
 #include "SkDebugCanvas.h"
 #include "SkPictureFlat.h"
+#include "SkPictureRecorder.h"
 
 #define WARN(msg)                                           \
     SkDebugf("%s:%d: %s\n", __FILE__, __LINE__, msg);
@@ -79,11 +80,11 @@ static SkPicture* create_save_layer_opt_1(SkTDArray<DrawType>* preOptPattern,
         (*postOptPattern)[6] = RESTORE;
     }
 
-    SkPicture* result = new SkPicture;
+    SkPictureRecorder recorder;
 
+    SkCanvas* canvas = recorder.beginRecording(100, 100, NULL, 0);
     // have to disable the optimizations while generating the picture
-    SkCanvas* canvas = result->beginRecording(100, 100,
-                         SkPicture::kDisableRecordOptimizations_RecordingFlag);
+    recorder.internalOnly_EnableOpts(false);
 
     SkPaint saveLayerPaint;
     saveLayerPaint.setColor(0xCC000000);
@@ -112,9 +113,7 @@ static SkPicture* create_save_layer_opt_1(SkTDArray<DrawType>* preOptPattern,
     }
     canvas->restore();
 
-    result->endRecording();
-
-    return result;
+    return recorder.endRecording();
 }
 
 // straight-ahead version that is seen in the skps
@@ -215,11 +214,11 @@ static SkPicture* create_save_layer_opt_2(SkTDArray<DrawType>* preOptPattern,
         (*postOptPattern)[9] = RESTORE;
     }
 
-    SkPicture* result = new SkPicture;
+    SkPictureRecorder recorder;
 
+    SkCanvas* canvas = recorder.beginRecording(100, 100, NULL, 0);
     // have to disable the optimizations while generating the picture
-    SkCanvas* canvas = result->beginRecording(100, 100,
-                         SkPicture::kDisableRecordOptimizations_RecordingFlag);
+    recorder.internalOnly_EnableOpts(false);
 
     SkPaint saveLayerPaint;
     saveLayerPaint.setColor(0xCC000000);
@@ -252,9 +251,7 @@ static SkPicture* create_save_layer_opt_2(SkTDArray<DrawType>* preOptPattern,
     canvas->restore();
     canvas->restore();
 
-    result->endRecording();
-
-    return result;
+    return recorder.endRecording();
 }
 
 // straight-ahead version that is seen in the skps
@@ -311,6 +308,14 @@ public:
     static const int kHeight = 800;
 
 protected:
+    uint32_t onGetFlags() const SK_OVERRIDE {
+        // One optimization changes the color drawn slightly in a 565 target.
+        // We've decided it's innocuous, so we disable this GM when targeting 565.
+        // Revisit this if we get finer-grained control: it'd be nice to keep drawing directly.
+        // For more, see skia:1994.
+        return skiagm::GM::kSkip565_Flag;
+    }
+
     SkString onShortName() {
         return SkString("optimizations");
     }
@@ -352,13 +357,13 @@ protected:
             canvas->restore();
 
             // re-render the 'pre' picture and thus 'apply' the optimization
-            SkAutoTUnref<SkPicture> post(new SkPicture);
+            SkPictureRecorder recorder;
 
-            SkCanvas* recordCanvas = post->beginRecording(pre->width(), pre->height());
+            SkCanvas* recordCanvas = recorder.beginRecording(pre->width(), pre->height(), NULL, 0);
 
             pre->draw(recordCanvas);
 
-            post->endRecording();
+            SkAutoTUnref<SkPicture> post(recorder.endRecording());
 
             if (!(check_pattern(*post, postPattern))) {
                 WARN("Post optimization pattern mismatch");
@@ -387,10 +392,7 @@ private:
         static const unsigned int kCheckerboardWidth = 16;
         static const unsigned int kCheckerboardHeight = 16;
 
-        fCheckerboard.setConfig(SkBitmap::kARGB_8888_Config,
-                                kCheckerboardWidth, kCheckerboardHeight);
-        fCheckerboard.allocPixels();
-        SkAutoLockPixels lock(fCheckerboard);
+        fCheckerboard.allocN32Pixels(kCheckerboardWidth, kCheckerboardHeight);
         for (unsigned int y = 0; y < kCheckerboardHeight; y += 2) {
             SkPMColor* scanline = fCheckerboard.getAddr32(0, y);
             for (unsigned int x = 0; x < kCheckerboardWidth; x += 2) {

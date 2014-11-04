@@ -4,7 +4,7 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkBitmapDevice.h"
 #include "SkCanvas.h"
 #include "SkMagnifierImageFilter.h"
@@ -15,7 +15,7 @@
 #define FILTER_WIDTH_LARGE  256
 #define FILTER_HEIGHT_LARGE 256
 
-class MagnifierBench : public SkBenchmark {
+class MagnifierBench : public Benchmark {
 public:
     MagnifierBench(bool small) :
         fIsSmall(small), fInitialized(false) {
@@ -38,7 +38,7 @@ protected:
         const int h = fIsSmall ? FILTER_HEIGHT_SMALL : FILTER_HEIGHT_LARGE;
         SkPaint paint;
         paint.setImageFilter(
-            new SkMagnifierImageFilter(
+            SkMagnifierImageFilter::Create(
                 SkRect::MakeXYWH(SkIntToScalar(w / 4),
                                  SkIntToScalar(h / 4),
                                  SkIntToScalar(w / 2),
@@ -53,10 +53,8 @@ private:
     void make_checkerboard() {
         const int w = fIsSmall ? FILTER_WIDTH_SMALL : FILTER_WIDTH_LARGE;
         const int h = fIsSmall ? FILTER_HEIGHT_LARGE : FILTER_HEIGHT_LARGE;
-        fCheckerboard.setConfig(SkBitmap::kARGB_8888_Config, w, h);
-        fCheckerboard.allocPixels();
-        SkBitmapDevice device(fCheckerboard);
-        SkCanvas canvas(&device);
+        fCheckerboard.allocN32Pixels(w, h);
+        SkCanvas canvas(fCheckerboard);
         canvas.clear(0x00000000);
         SkPaint darkPaint;
         darkPaint.setColor(0xFF804020);
@@ -78,7 +76,7 @@ private:
     bool fIsSmall;
     bool fInitialized;
     SkBitmap fCheckerboard;
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

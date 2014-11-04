@@ -1,15 +1,14 @@
-
 /*
  * Copyright 2011 Google Inc.
  *
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
+
 #ifndef skiagm_DEFINED
 #define skiagm_DEFINED
 
 #include "SkBitmap.h"
-#include "SkBitmapDevice.h"
 #include "SkCanvas.h"
 #include "SkPaint.h"
 #include "SkSize.h"
@@ -25,12 +24,6 @@
     static skiagm::GMRegistry   SK_MACRO_APPEND_LINE(R_)(SK_MACRO_APPEND_LINE(F_));
 
 namespace skiagm {
-
-    static inline SkISize make_isize(int w, int h) {
-        SkISize sz;
-        sz.set(w, h);
-        return sz;
-    }
 
     class GM {
     public:
@@ -49,14 +42,25 @@ namespace skiagm {
             kSkipPDFRasterization_Flag  = 1 << 8,
 
             kGPUOnly_Flag               = 1 << 9,
+
+            kAsBench_Flag               = 1 << 10, // Run the GM as a benchmark in the bench tool
         };
+
+        enum Mode {
+            kGM_Mode,
+            kSample_Mode,
+            kBench_Mode,
+        };
+
+        void setMode(Mode mode) { fMode = mode; }
+        Mode getMode() const { return fMode; }
 
         void draw(SkCanvas*);
         void drawBackground(SkCanvas*);
         void drawContent(SkCanvas*);
 
         SkISize getISize() { return this->onISize(); }
-        const char* shortName();
+        const char* getName();
 
         uint32_t getFlags() const {
             return this->onGetFlags();
@@ -86,27 +90,17 @@ namespace skiagm {
         // GM's getISize bounds.
         void drawSizeBounds(SkCanvas*, SkColor);
 
-        static void SetResourcePath(const char* resourcePath) {
-            gResourcePath = resourcePath;
-        }
-
-        static SkString& GetResourcePath() {
-            return gResourcePath;
-        }
-
         bool isCanvasDeferred() const { return fCanvasIsDeferred; }
         void setCanvasIsDeferred(bool isDeferred) {
             fCanvasIsDeferred = isDeferred;
         }
 
-    const SkMatrix& getStarterMatrix() { return fStarterMatrix; }
-    void setStarterMatrix(const SkMatrix& matrix) {
-        fStarterMatrix = matrix;
-    }
+        const SkMatrix& getStarterMatrix() { return fStarterMatrix; }
+        void setStarterMatrix(const SkMatrix& matrix) {
+            fStarterMatrix = matrix;
+        }
 
     protected:
-        static SkString gResourcePath;
-
         virtual void onOnceBeforeDraw() {}
         virtual void onDraw(SkCanvas*) = 0;
         virtual void onDrawBackground(SkCanvas*);
@@ -116,6 +110,7 @@ namespace skiagm {
         virtual SkMatrix onGetInitialTransform() const { return SkMatrix::I(); }
 
     private:
+        Mode     fMode;
         SkString fShortName;
         SkColor  fBGColor;
         bool     fCanvasIsDeferred; // work-around problem in srcmode.cpp

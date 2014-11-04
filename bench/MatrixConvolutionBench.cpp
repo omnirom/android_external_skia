@@ -4,14 +4,14 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkCanvas.h"
+#include "SkMatrixConvolutionImageFilter.h"
 #include "SkPaint.h"
 #include "SkRandom.h"
 #include "SkString.h"
-#include "SkMatrixConvolutionImageFilter.h"
 
-class MatrixConvolutionBench : public SkBenchmark {
+class MatrixConvolutionBench : public Benchmark {
 public:
     MatrixConvolutionBench(SkMatrixConvolutionImageFilter::TileMode tileMode, bool convolveAlpha)
         : fName("matrixconvolution") {
@@ -22,8 +22,8 @@ public:
             SkIntToScalar( 1), SkIntToScalar( 1), SkIntToScalar( 1),
         };
         SkScalar gain = 0.3f, bias = SkIntToScalar(100);
-        SkIPoint target = SkIPoint::Make(1, 1);
-        fFilter = new SkMatrixConvolutionImageFilter(kernelSize, kernel, gain, bias, target, tileMode, convolveAlpha);
+        SkIPoint kernelOffset = SkIPoint::Make(1, 1);
+        fFilter = SkMatrixConvolutionImageFilter::Create(kernelSize, kernel, gain, bias, kernelOffset, tileMode, convolveAlpha);
     }
 
     ~MatrixConvolutionBench() {
@@ -49,7 +49,7 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
     SkMatrixConvolutionImageFilter* fFilter;
     SkString fName;
 };

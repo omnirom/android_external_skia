@@ -5,22 +5,14 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
-#include "TestClassDef.h"
 #include "SkMath.h"
 #include "SkMatrix.h"
 #include "SkMatrixUtils.h"
 #include "SkRandom.h"
+#include "Test.h"
 
 static bool nearly_equal_scalar(SkScalar a, SkScalar b) {
-    // Note that we get more compounded error for multiple operations when
-    // SK_SCALAR_IS_FIXED.
-#ifdef SK_SCALAR_IS_FLOAT
     const SkScalar tolerance = SK_Scalar1 / 200000;
-#else
-    const SkScalar tolerance = SK_Scalar1 / 1024;
-#endif
-
     return SkScalarAbs(a - b) <= tolerance;
 }
 
@@ -40,7 +32,6 @@ static bool are_equal(skiatest::Reporter* reporter,
     bool equal = a == b;
     bool cheapEqual = a.cheapEqualTo(b);
     if (equal != cheapEqual) {
-#ifdef SK_SCALAR_IS_FLOAT
         if (equal) {
             bool foundZeroSignDiff = false;
             for (int i = 0; i < 9; ++i) {
@@ -70,9 +61,6 @@ static bool are_equal(skiatest::Reporter* reporter,
             }
             REPORTER_ASSERT(reporter, foundNaN);
         }
-#else
-        REPORTER_ASSERT(reporter, false);
-#endif
     }
     return equal;
 }
@@ -131,44 +119,68 @@ static void test_flatten(skiatest::Reporter* reporter, const SkMatrix& m) {
     REPORTER_ASSERT(reporter, memcmp(buffer, buffer2, size1) == 0);
 }
 
-static void test_matrix_min_max_stretch(skiatest::Reporter* reporter) {
+static void test_matrix_min_max_scale(skiatest::Reporter* reporter) {
+    SkScalar scales[2];
+    bool success;
+
     SkMatrix identity;
     identity.reset();
-    REPORTER_ASSERT(reporter, SK_Scalar1 == identity.getMinStretch());
-    REPORTER_ASSERT(reporter, SK_Scalar1 == identity.getMaxStretch());
+    REPORTER_ASSERT(reporter, SK_Scalar1 == identity.getMinScale());
+    REPORTER_ASSERT(reporter, SK_Scalar1 == identity.getMaxScale());
+    success = identity.getMinMaxScales(scales);
+    REPORTER_ASSERT(reporter, success && SK_Scalar1 == scales[0] && SK_Scalar1 == scales[1]);
 
     SkMatrix scale;
     scale.setScale(SK_Scalar1 * 2, SK_Scalar1 * 4);
-    REPORTER_ASSERT(reporter, SK_Scalar1 * 2 == scale.getMinStretch());
-    REPORTER_ASSERT(reporter, SK_Scalar1 * 4 == scale.getMaxStretch());
+    REPORTER_ASSERT(reporter, SK_Scalar1 * 2 == scale.getMinScale());
+    REPORTER_ASSERT(reporter, SK_Scalar1 * 4 == scale.getMaxScale());
+    success = scale.getMinMaxScales(scales);
+    REPORTER_ASSERT(reporter, success && SK_Scalar1 * 2 == scales[0] && SK_Scalar1 * 4 == scales[1]);
 
     SkMatrix rot90Scale;
     rot90Scale.setRotate(90 * SK_Scalar1);
     rot90Scale.postScale(SK_Scalar1 / 4, SK_Scalar1 / 2);
-    REPORTER_ASSERT(reporter, SK_Scalar1 / 4 == rot90Scale.getMinStretch());
-    REPORTER_ASSERT(reporter, SK_Scalar1 / 2 == rot90Scale.getMaxStretch());
+    REPORTER_ASSERT(reporter, SK_Scalar1 / 4 == rot90Scale.getMinScale());
+    REPORTER_ASSERT(reporter, SK_Scalar1 / 2 == rot90Scale.getMaxScale());
+    success = rot90Scale.getMinMaxScales(scales);
+    REPORTER_ASSERT(reporter, success && SK_Scalar1 / 4  == scales[0] && SK_Scalar1 / 2 == scales[1]);
 
     SkMatrix rotate;
     rotate.setRotate(128 * SK_Scalar1);
-    REPORTER_ASSERT(reporter, SkScalarNearlyEqual(SK_Scalar1, rotate.getMinStretch() ,SK_ScalarNearlyZero));
-    REPORTER_ASSERT(reporter, SkScalarNearlyEqual(SK_Scalar1, rotate.getMaxStretch(), SK_ScalarNearlyZero));
+    REPORTER_ASSERT(reporter, SkScalarNearlyEqual(SK_Scalar1, rotate.getMinScale(), SK_ScalarNearlyZero));
+    REPORTER_ASSERT(reporter, SkScalarNearlyEqual(SK_Scalar1, rotate.getMaxScale(), SK_ScalarNearlyZero));
+    success = rotate.getMinMaxScales(scales);
+    REPORTER_ASSERT(reporter, success);
+    REPORTER_ASSERT(reporter, SkScalarNearlyEqual(SK_Scalar1, scales[0], SK_ScalarNearlyZero));
+    REPORTER_ASSERT(reporter, SkScalarNearlyEqual(SK_Scalar1, scales[1], SK_ScalarNearlyZero));
 
     SkMatrix translate;
     translate.setTranslate(10 * SK_Scalar1, -5 * SK_Scalar1);
-    REPORTER_ASSERT(reporter, SK_Scalar1 == translate.getMinStretch());
-    REPORTER_ASSERT(reporter, SK_Scalar1 == translate.getMaxStretch());
+    REPORTER_ASSERT(reporter, SK_Scalar1 == translate.getMinScale());
+    REPORTER_ASSERT(reporter, SK_Scalar1 == translate.getMaxScale());
+    success = translate.getMinMaxScales(scales);
+    REPORTER_ASSERT(reporter, success && SK_Scalar1 == scales[0] && SK_Scalar1 == scales[1]);
 
     SkMatrix perspX;
     perspX.reset();
     perspX.setPerspX(SkScalarToPersp(SK_Scalar1 / 1000));
-    REPORTER_ASSERT(reporter, -SK_Scalar1 == perspX.getMinStretch());
-    REPORTER_ASSERT(reporter, -SK_Scalar1 == perspX.getMaxStretch());
+    REPORTER_ASSERT(reporter, -SK_Scalar1 == perspX.getMinScale());
+    REPORTER_ASSERT(reporter, -SK_Scalar1 == perspX.getMaxScale());
+    // Verify that getMinMaxScales() doesn't update the scales array on failure.
+    scales[0] = -5;
+    scales[1] = -5;
+    success = perspX.getMinMaxScales(scales);
+    REPORTER_ASSERT(reporter, !success && -5 * SK_Scalar1 == scales[0] && -5 * SK_Scalar1  == scales[1]);
 
     SkMatrix perspY;
     perspY.reset();
     perspY.setPerspY(SkScalarToPersp(-SK_Scalar1 / 500));
-    REPORTER_ASSERT(reporter, -SK_Scalar1 == perspY.getMinStretch());
-    REPORTER_ASSERT(reporter, -SK_Scalar1 == perspY.getMaxStretch());
+    REPORTER_ASSERT(reporter, -SK_Scalar1 == perspY.getMinScale());
+    REPORTER_ASSERT(reporter, -SK_Scalar1 == perspY.getMaxScale());
+    scales[0] = -5;
+    scales[1] = -5;
+    success = perspY.getMinMaxScales(scales);
+    REPORTER_ASSERT(reporter, !success && -5 * SK_Scalar1 == scales[0] && -5 * SK_Scalar1  == scales[1]);
 
     SkMatrix baseMats[] = {scale, rot90Scale, rotate,
                            translate, perspX, perspY};
@@ -187,20 +199,25 @@ static void test_matrix_min_max_stretch(skiatest::Reporter* reporter) {
             mat.postConcat(mats[x]);
         }
 
-        SkScalar minStretch = mat.getMinStretch();
-        SkScalar maxStretch = mat.getMaxStretch();
-        REPORTER_ASSERT(reporter, (minStretch < 0) == (maxStretch < 0));
-        REPORTER_ASSERT(reporter, (maxStretch < 0) == mat.hasPerspective());
+        SkScalar minScale = mat.getMinScale();
+        SkScalar maxScale = mat.getMaxScale();
+        REPORTER_ASSERT(reporter, (minScale < 0) == (maxScale < 0));
+        REPORTER_ASSERT(reporter, (maxScale < 0) == mat.hasPerspective());
+
+        SkScalar scales[2];
+        bool success = mat.getMinMaxScales(scales);
+        REPORTER_ASSERT(reporter, success == !mat.hasPerspective());
+        REPORTER_ASSERT(reporter, !success || (scales[0] == minScale && scales[1] == maxScale));
 
         if (mat.hasPerspective()) {
             m -= 1; // try another non-persp matrix
             continue;
         }
 
-        // test a bunch of vectors. All should be scaled by between minStretch and maxStretch
+        // test a bunch of vectors. All should be scaled by between minScale and maxScale
         // (modulo some error) and we should find a vector that is scaled by almost each.
-        static const SkScalar gVectorStretchTol = (105 * SK_Scalar1) / 100;
-        static const SkScalar gClosestStretchTol = (97 * SK_Scalar1) / 100;
+        static const SkScalar gVectorScaleTol = (105 * SK_Scalar1) / 100;
+        static const SkScalar gCloseScaleTol = (97 * SK_Scalar1) / 100;
         SkScalar max = 0, min = SK_ScalarMax;
         SkVector vectors[1000];
         for (size_t i = 0; i < SK_ARRAY_COUNT(vectors); ++i) {
@@ -214,8 +231,8 @@ static void test_matrix_min_max_stretch(skiatest::Reporter* reporter) {
         mat.mapVectors(vectors, SK_ARRAY_COUNT(vectors));
         for (size_t i = 0; i < SK_ARRAY_COUNT(vectors); ++i) {
             SkScalar d = vectors[i].length();
-            REPORTER_ASSERT(reporter, SkScalarDiv(d, maxStretch) < gVectorStretchTol);
-            REPORTER_ASSERT(reporter, SkScalarDiv(minStretch, d) < gVectorStretchTol);
+            REPORTER_ASSERT(reporter, SkScalarDiv(d, maxScale) < gVectorScaleTol);
+            REPORTER_ASSERT(reporter, SkScalarDiv(minScale, d) < gVectorScaleTol);
             if (max < d) {
                 max = d;
             }
@@ -223,8 +240,8 @@ static void test_matrix_min_max_stretch(skiatest::Reporter* reporter) {
                 min = d;
             }
         }
-        REPORTER_ASSERT(reporter, SkScalarDiv(max, maxStretch) >= gClosestStretchTol);
-        REPORTER_ASSERT(reporter, SkScalarDiv(minStretch, min) >= gClosestStretchTol);
+        REPORTER_ASSERT(reporter, SkScalarDiv(max, maxScale) >= gCloseScaleTol);
+        REPORTER_ASSERT(reporter, SkScalarDiv(minScale, min) >= gCloseScaleTol);
     }
 }
 
@@ -299,21 +316,17 @@ static void test_matrix_is_similarity(skiatest::Reporter* reporter) {
     mat.setPerspY(SkScalarToPersp(SK_Scalar1 / 2));
     REPORTER_ASSERT(reporter, !mat.isSimilarity());
 
-#ifdef SK_SCALAR_IS_FLOAT
-    /* We bypass the following tests for SK_SCALAR_IS_FIXED build.
-     * The long discussion can be found in this issue:
-     *     http://codereview.appspot.com/5999050/
-     * In short, we haven't found a perfect way to fix the precision
-     * issue, i.e. the way we use tolerance in isSimilarityTransformation
-     * is incorrect. The situation becomes worse in fixed build, so
-     * we disabled rotation related tests for fixed build.
-     */
-
     // rotate
     for (int angle = 0; angle < 360; ++angle) {
         mat.reset();
         mat.setRotate(SkIntToScalar(angle));
+#ifndef SK_CPU_ARM64
         REPORTER_ASSERT(reporter, mat.isSimilarity());
+#else
+        // 64-bit ARM devices built with -O2 and -ffp-contract=fast have a loss
+        // of precision and require that we have a higher tolerance
+        REPORTER_ASSERT(reporter, mat.isSimilarity(SK_ScalarNearlyZero + 0.00010113f));
+#endif
     }
 
     // see if there are any accumulated precision issues
@@ -340,7 +353,6 @@ static void test_matrix_is_similarity(skiatest::Reporter* reporter) {
     mat.setRotate(SkIntToScalar(30));
     mat.postScale(SkIntToScalar(3), SkIntToScalar(2));
     REPORTER_ASSERT(reporter, !mat.isSimilarity());
-#endif
 
     // all zero
     mat.setAll(0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -800,16 +812,24 @@ DEF_TEST(Matrix, reporter) {
     mat.reset();
     mat.set(SkMatrix::kMSkewX, SK_ScalarNaN);
     mat2.set(SkMatrix::kMSkewX, SK_ScalarNaN);
-    // fixed pt doesn't have the property that NaN does not equal itself.
-#ifdef SK_SCALAR_IS_FIXED
-    REPORTER_ASSERT(reporter, are_equal(reporter, mat, mat2));
-#else
     REPORTER_ASSERT(reporter, !are_equal(reporter, mat, mat2));
-#endif
 
-    test_matrix_min_max_stretch(reporter);
+    test_matrix_min_max_scale(reporter);
     test_matrix_is_similarity(reporter);
     test_matrix_recttorect(reporter);
     test_matrix_decomposition(reporter);
     test_matrix_homogeneous(reporter);
+}
+
+DEF_TEST(Matrix_Concat, r) {
+    SkMatrix a;
+    a.setTranslate(10, 20);
+
+    SkMatrix b;
+    b.setScale(3, 5);
+
+    SkMatrix expected;
+    expected.setConcat(a,b);
+
+    REPORTER_ASSERT(r, expected == SkMatrix::Concat(a, b));
 }

@@ -659,22 +659,20 @@ SkPDFObject* SkPDFShader::GetPDFShader(const SkShader& shader,
 
 // static
 SkTDArray<SkPDFShader::ShaderCanonicalEntry>& SkPDFShader::CanonicalShaders() {
-    // This initialization is only thread safe with gcc.
+    SkPDFShader::CanonicalShadersMutex().assertHeld();
     static SkTDArray<ShaderCanonicalEntry> gCanonicalShaders;
     return gCanonicalShaders;
 }
 
 // static
 SkBaseMutex& SkPDFShader::CanonicalShadersMutex() {
-    // This initialization is only thread safe with gcc or when
-    // POD-style mutex initialization is used.
     SK_DECLARE_STATIC_MUTEX(gCanonicalShadersMutex);
     return gCanonicalShadersMutex;
 }
 
 // static
 SkPDFObject* SkPDFFunctionShader::RangeObject() {
-    // This initialization is only thread safe with gcc.
+    SkPDFShader::CanonicalShadersMutex().assertHeld();
     static SkPDFArray* range = NULL;
     // This method is only used with CanonicalShadersMutex, so it's safe to
     // populate domain.
@@ -988,8 +986,8 @@ SkPDFImageShader::SkPDFImageShader(SkPDFShader::State* state) : fState(state) {
     SkMatrix unflip;
     unflip.setTranslate(0, SkScalarRoundToScalar(deviceBounds.height()));
     unflip.preScale(SK_Scalar1, -SK_Scalar1);
-    SkISize size = SkISize::Make(SkScalarRound(deviceBounds.width()),
-                                 SkScalarRound(deviceBounds.height()));
+    SkISize size = SkISize::Make(SkScalarRoundToInt(deviceBounds.width()),
+                                 SkScalarRoundToInt(deviceBounds.height()));
     // TODO(edisonn): should we pass here the DCT encoder of the destination device?
     // TODO(edisonn): NYI Perspective, use SkPDFDeviceFlattener.
     SkPDFDevice pattern(size, size, unflip);

@@ -4,7 +4,7 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkBitmapDevice.h"
 #include "SkBitmapSource.h"
 #include "SkCanvas.h"
@@ -15,7 +15,7 @@
 #define FILTER_WIDTH_LARGE  256
 #define FILTER_HEIGHT_LARGE 256
 
-class DisplacementBaseBench : public SkBenchmark {
+class DisplacementBaseBench : public Benchmark {
 public:
     DisplacementBaseBench(bool small) :
         fInitialized(false), fIsSmall(small) {
@@ -33,10 +33,8 @@ protected:
     void makeBitmap() {
         const int w = this->isSmall() ? FILTER_WIDTH_SMALL : FILTER_WIDTH_LARGE;
         const int h = this->isSmall() ? FILTER_HEIGHT_LARGE : FILTER_HEIGHT_LARGE;
-        fBitmap.setConfig(SkBitmap::kARGB_8888_Config, w, h);
-        fBitmap.allocPixels();
-        SkBitmapDevice device(fBitmap);
-        SkCanvas canvas(&device);
+        fBitmap.allocN32Pixels(w, h);
+        SkCanvas canvas(fBitmap);
         canvas.clear(0x00000000);
         SkPaint paint;
         paint.setAntiAlias(true);
@@ -49,10 +47,8 @@ protected:
     void makeCheckerboard() {
         const int w = this->isSmall() ? FILTER_WIDTH_SMALL : FILTER_WIDTH_LARGE;
         const int h = this->isSmall() ? FILTER_HEIGHT_LARGE : FILTER_HEIGHT_LARGE;
-        fCheckerboard.setConfig(SkBitmap::kARGB_8888_Config, w, h);
-        fCheckerboard.allocPixels();
-        SkBitmapDevice device(fCheckerboard);
-        SkCanvas canvas(&device);
+        fCheckerboard.allocN32Pixels(w, h);
+        SkCanvas canvas(fCheckerboard);
         canvas.clear(0x00000000);
         SkPaint darkPaint;
         darkPaint.setColor(0xFF804020);
@@ -86,7 +82,7 @@ protected:
 private:
     bool fInitialized;
     bool fIsSmall;
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 class DisplacementZeroBench : public DisplacementBaseBench {
@@ -101,11 +97,11 @@ protected:
 
     virtual void onDraw(const int loops, SkCanvas* canvas) SK_OVERRIDE {
         SkPaint paint;
-        SkAutoTUnref<SkImageFilter> displ(SkNEW_ARGS(SkBitmapSource, (fCheckerboard)));
+        SkAutoTUnref<SkImageFilter> displ(SkBitmapSource::Create(fCheckerboard));
         // No displacement effect
-        paint.setImageFilter(SkNEW_ARGS(SkDisplacementMapEffect,
-            (SkDisplacementMapEffect::kR_ChannelSelectorType,
-             SkDisplacementMapEffect::kG_ChannelSelectorType, 0.0f, displ)))->unref();
+        paint.setImageFilter(SkDisplacementMapEffect::Create(
+            SkDisplacementMapEffect::kR_ChannelSelectorType,
+            SkDisplacementMapEffect::kG_ChannelSelectorType, 0.0f, displ))->unref();
 
         for (int i = 0; i < loops; i++) {
             this->drawClippedBitmap(canvas, 0, 0, paint);
@@ -128,11 +124,11 @@ protected:
 
     virtual void onDraw(const int loops, SkCanvas* canvas) SK_OVERRIDE {
         SkPaint paint;
-        SkAutoTUnref<SkImageFilter> displ(SkNEW_ARGS(SkBitmapSource, (fCheckerboard)));
+        SkAutoTUnref<SkImageFilter> displ(SkBitmapSource::Create(fCheckerboard));
         // Displacement, with 1 alpha component (which isn't pre-multiplied)
-        paint.setImageFilter(SkNEW_ARGS(SkDisplacementMapEffect,
-            (SkDisplacementMapEffect::kB_ChannelSelectorType,
-             SkDisplacementMapEffect::kA_ChannelSelectorType, 16.0f, displ)))->unref();
+        paint.setImageFilter(SkDisplacementMapEffect::Create(
+            SkDisplacementMapEffect::kB_ChannelSelectorType,
+            SkDisplacementMapEffect::kA_ChannelSelectorType, 16.0f, displ))->unref();
         for (int i = 0; i < loops; i++) {
             drawClippedBitmap(canvas, 100, 0, paint);
         }
@@ -154,11 +150,11 @@ protected:
 
     virtual void onDraw(const int loops, SkCanvas* canvas) SK_OVERRIDE {
         SkPaint paint;
-        SkAutoTUnref<SkImageFilter> displ(SkNEW_ARGS(SkBitmapSource, (fCheckerboard)));
+        SkAutoTUnref<SkImageFilter> displ(SkBitmapSource::Create(fCheckerboard));
         // Displacement, with 2 non-alpha components
-        paint.setImageFilter(SkNEW_ARGS(SkDisplacementMapEffect,
-            (SkDisplacementMapEffect::kR_ChannelSelectorType,
-             SkDisplacementMapEffect::kB_ChannelSelectorType, 32.0f, displ)))->unref();
+        paint.setImageFilter(SkDisplacementMapEffect::Create(
+            SkDisplacementMapEffect::kR_ChannelSelectorType,
+            SkDisplacementMapEffect::kB_ChannelSelectorType, 32.0f, displ))->unref();
         for (int i = 0; i < loops; ++i) {
             this->drawClippedBitmap(canvas, 200, 0, paint);
         }

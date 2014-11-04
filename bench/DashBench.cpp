@@ -5,7 +5,7 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkBitmap.h"
 #include "SkCanvas.h"
 #include "SkDashPathEffect.h"
@@ -29,7 +29,7 @@ static void path_hline(SkPath* path) {
     path->lineTo(SkIntToScalar(600), SkIntToScalar(10));
 }
 
-class DashBench : public SkBenchmark {
+class DashBench : public Benchmark {
 protected:
     SkString            fName;
     SkTDArray<SkScalar> fIntervals;
@@ -71,8 +71,8 @@ protected:
         SkPath path;
         this->makePath(&path);
 
-        paint.setPathEffect(new SkDashPathEffect(fIntervals.begin(),
-                                                 fIntervals.count(), 0))->unref();
+        paint.setPathEffect(SkDashPathEffect::Create(fIntervals.begin(),
+                                                     fIntervals.count(), 0))->unref();
 
         if (fDoClip) {
             SkRect r = path.getBounds();
@@ -94,7 +94,7 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 class RectDashBench : public DashBench {
@@ -175,7 +175,7 @@ static void make_cubic(SkPath* path) {
                   x0 + 600 * SK_Scalar1, y0);
 }
 
-class MakeDashBench : public SkBenchmark {
+class MakeDashBench : public Benchmark {
     SkString fName;
     SkPath   fPath;
     SkAutoTUnref<SkPathEffect> fPE;
@@ -186,7 +186,7 @@ public:
         proc(&fPath);
 
         SkScalar vals[] = { SkIntToScalar(4), SkIntToScalar(4) };
-        fPE.reset(new SkDashPathEffect(vals, 2, 0));
+        fPE.reset(SkDashPathEffect::Create(vals, 2, 0));
     }
 
 protected:
@@ -205,13 +205,13 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 /*
  *  We try to special case square dashes (intervals are equal to strokewidth).
  */
-class DashLineBench : public SkBenchmark {
+class DashLineBench : public Benchmark {
     SkString fName;
     SkScalar fStrokeWidth;
     bool     fIsRound;
@@ -224,7 +224,7 @@ public:
         fIsRound = isRound;
 
         SkScalar vals[] = { SK_Scalar1, SK_Scalar1 };
-        fPE.reset(new SkDashPathEffect(vals, 2, 0));
+        fPE.reset(SkDashPathEffect::Create(vals, 2, 0));
     }
 
 protected:
@@ -245,10 +245,10 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
-class DrawPointsDashingBench : public SkBenchmark {
+class DrawPointsDashingBench : public Benchmark {
     SkString fName;
     int      fStrokeWidth;
     bool     fDoAA;
@@ -263,7 +263,7 @@ public:
         fDoAA = doAA;
 
         SkScalar vals[] = { SkIntToScalar(dashLength), SkIntToScalar(dashLength) };
-        fPathEffect.reset(new SkDashPathEffect(vals, 2, SK_Scalar1, false));
+        fPathEffect.reset(SkDashPathEffect::Create(vals, 2, SK_Scalar1));
     }
 
 protected:
@@ -292,11 +292,11 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 // Want to test how we handle dashing when 99% of the dash is clipped out
-class GiantDashBench : public SkBenchmark {
+class GiantDashBench : public Benchmark {
     SkString fName;
     SkScalar fStrokeWidth;
     SkPoint  fPts[2];
@@ -322,9 +322,9 @@ public:
 
         // deliberately pick intervals that won't be caught by asPoints(), so
         // we can test the filterPath code-path.
-        const SkScalar intervals[] = { 2, 1, 1, 1 };
-        fPathEffect.reset(new SkDashPathEffect(intervals,
-                                               SK_ARRAY_COUNT(intervals), 0));
+        const SkScalar intervals[] = { 20, 10, 10, 10 };
+        fPathEffect.reset(SkDashPathEffect::Create(intervals,
+                                                   SK_ARRAY_COUNT(intervals), 0));
 
         SkScalar cx = 640 / 2;  // center X
         SkScalar cy = 480 / 2;  // center Y
@@ -370,9 +370,75 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
+// Want to test how we draw a dashed grid (like what is used in spreadsheets) of many
+// small dashed lines switching back and forth between horizontal and vertical
+class DashGridBench : public Benchmark {
+    SkString fName;
+    int      fStrokeWidth;
+    bool     fDoAA;
+
+    SkAutoTUnref<SkPathEffect> fPathEffect;
+
+public:
+    DashGridBench(int dashLength, int strokeWidth, bool doAA) {
+        fName.printf("dashgrid_%d_%d%s", dashLength, strokeWidth, doAA ? "_aa" : "_bw");
+        fStrokeWidth = strokeWidth;
+        fDoAA = doAA;
+
+        SkScalar vals[] = { SkIntToScalar(dashLength), SkIntToScalar(dashLength) };
+        fPathEffect.reset(SkDashPathEffect::Create(vals, 2, SK_Scalar1));
+    }
+
+protected:
+    virtual const char* onGetName() SK_OVERRIDE {
+        return fName.c_str();
+    }
+
+    virtual void onDraw(const int loops, SkCanvas* canvas) SK_OVERRIDE {
+        SkPaint p;
+        this->setupPaint(&p);
+        p.setColor(SK_ColorBLACK);
+        p.setStyle(SkPaint::kStroke_Style);
+        p.setStrokeWidth(SkIntToScalar(fStrokeWidth));
+        p.setPathEffect(fPathEffect);
+        p.setAntiAlias(fDoAA);
+
+        SkPoint pts[4] = {
+            { SkIntToScalar(0), 20.5f },
+            { SkIntToScalar(20), 20.5f },
+            { 20.5f, SkIntToScalar(0) },
+            { 20.5f, SkIntToScalar(20) }
+        };
+
+        for (int i = 0; i < loops; ++i) {
+            for (int j = 0; j < 10; ++j) {
+                for (int k = 0; k < 10; ++k) {
+                    // Horizontal line
+                    SkPoint horPts[2];
+                    horPts[0].fX = pts[0].fX + k * 22.f;
+                    horPts[0].fY = pts[0].fY + j * 22.f;
+                    horPts[1].fX = pts[1].fX + k * 22.f;
+                    horPts[1].fY = pts[1].fY + j * 22.f;
+                    canvas->drawPoints(SkCanvas::kLines_PointMode, 2, horPts, p);
+
+                    // Vertical line
+                    SkPoint vertPts[2];
+                    vertPts[0].fX = pts[2].fX + k * 22.f;
+                    vertPts[0].fY = pts[2].fY + j * 22.f;
+                    vertPts[1].fX = pts[3].fX + k * 22.f;
+                    vertPts[1].fY = pts[3].fY + j * 22.f;
+                    canvas->drawPoints(SkCanvas::kLines_PointMode, 2, vertPts, p);
+                }
+            }
+        }
+    }
+
+private:
+    typedef Benchmark INHERITED;
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -415,4 +481,9 @@ DEF_BENCH( return new GiantDashBench(GiantDashBench::kDiag_LineType, 0); )
 DEF_BENCH( return new GiantDashBench(GiantDashBench::kHori_LineType, 2); )
 DEF_BENCH( return new GiantDashBench(GiantDashBench::kVert_LineType, 2); )
 DEF_BENCH( return new GiantDashBench(GiantDashBench::kDiag_LineType, 2); )
+
+DEF_BENCH( return new DashGridBench(1, 1, true); )
+DEF_BENCH( return new DashGridBench(1, 1, false); )
+DEF_BENCH( return new DashGridBench(3, 1, true); )
+DEF_BENCH( return new DashGridBench(3, 1, false); )
 #endif

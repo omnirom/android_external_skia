@@ -7,7 +7,6 @@
 
 #include "SkScaledImageCache.h"
 #include "SkMipMap.h"
-#include "SkOnce.h"
 #include "SkPixelRef.h"
 #include "SkRect.h"
 
@@ -116,6 +115,9 @@ struct SkScaledImageCache::Rec {
         SkSafeUnref(fMip);
     }
 
+    static const Key& GetKey(const Rec& rec) { return rec.fKey; }
+    static uint32_t Hash(const Key& key) { return key.fHash; }
+
     size_t bytesUsed() const {
         return fMip ? fMip->getSize() : fBitmap.getSize();
     }
@@ -135,25 +137,9 @@ struct SkScaledImageCache::Rec {
 
 #include "SkTDynamicHash.h"
 
-namespace { // can't use static functions w/ template parameters
-const SkScaledImageCache::Key& key_from_rec(const SkScaledImageCache::Rec& rec) {
-    return rec.fKey;
-}
+class SkScaledImageCache::Hash :
+    public SkTDynamicHash<SkScaledImageCache::Rec, SkScaledImageCache::Key> {};
 
-uint32_t hash_from_key(const SkScaledImageCache::Key& key) {
-    return key.fHash;
-}
-
-bool eq_rec_key(const SkScaledImageCache::Rec& rec, const SkScaledImageCache::Key& key) {
-    return rec.fKey == key;
-}
-}
-
-class SkScaledImageCache::Hash : public SkTDynamicHash<SkScaledImageCache::Rec,
-                                                       SkScaledImageCache::Key,
-                                                       key_from_rec,
-                                                       hash_from_key,
-                                                       eq_rec_key> {};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -179,12 +165,13 @@ void SkScaledImageCache::init() {
 #else
     fHash = NULL;
 #endif
-    fBytesUsed = 0;
+    fTotalBytesUsed = 0;
     fCount = 0;
+    fSingleAllocationByteLimit = 0;
     fAllocator = NULL;
 
     // One of these should be explicit set by the caller after we return.
-    fByteLimit = 0;
+    fTotalByteLimit = 0;
     fDiscardableFactory = NULL;
 }
 
@@ -192,6 +179,7 @@ void SkScaledImageCache::init() {
 
 class SkOneShotDiscardablePixelRef : public SkPixelRef {
 public:
+    SK_DECLARE_INST_COUNT(SkOneShotDiscardablePixelRef)
     // Ownership of the discardablememory is transfered to the pixelref
     SkOneShotDiscardablePixelRef(const SkImageInfo&, SkDiscardableMemory*, size_t rowBytes);
     ~SkOneShotDiscardablePixelRef();
@@ -199,13 +187,11 @@ public:
     SK_DECLARE_UNFLATTENABLE_OBJECT()
 
 protected:
-    virtual void* onLockPixels(SkColorTable**) SK_OVERRIDE;
+    virtual bool onNewLockPixels(LockRec*) SK_OVERRIDE;
     virtual void onUnlockPixels() SK_OVERRIDE;
     virtual size_t getAllocatedSizeInBytes() const SK_OVERRIDE;
 
 private:
-    SkImageInfo fInfo;  // remove when SkPixelRef gets this in baseclass
-
     SkDiscardableMemory* fDM;
     size_t               fRB;
     bool                 fFirstTime;
@@ -220,8 +206,6 @@ SkOneShotDiscardablePixelRef::SkOneShotDiscardablePixelRef(const SkImageInfo& in
     , fDM(dm)
     , fRB(rowBytes)
 {
-    fInfo = info;   // remove this redundant field when SkPixelRef has info
-
     SkASSERT(dm->data());
     fFirstTime = true;
 }
@@ -230,26 +214,31 @@ SkOneShotDiscardablePixelRef::~SkOneShotDiscardablePixelRef() {
     SkDELETE(fDM);
 }
 
-void* SkOneShotDiscardablePixelRef::onLockPixels(SkColorTable** ctable) {
+bool SkOneShotDiscardablePixelRef::onNewLockPixels(LockRec* rec) {
     if (fFirstTime) {
         // we're already locked
         SkASSERT(fDM->data());
         fFirstTime = false;
-        return fDM->data();
+        goto SUCCESS;
     }
 
     // A previous call to onUnlock may have deleted our DM, so check for that
     if (NULL == fDM) {
-        return NULL;
+        return false;
     }
 
     if (!fDM->lock()) {
         // since it failed, we delete it now, to free-up the resource
         delete fDM;
         fDM = NULL;
-        return NULL;
+        return false;
     }
-    return fDM->data();
+
+SUCCESS:
+    rec->fPixels = fDM->data();
+    rec->fColorTable = NULL;
+    rec->fRowBytes = fRB;
+    return true;
 }
 
 void SkOneShotDiscardablePixelRef::onUnlockPixels() {
@@ -258,7 +247,7 @@ void SkOneShotDiscardablePixelRef::onUnlockPixels() {
 }
 
 size_t SkOneShotDiscardablePixelRef::getAllocatedSizeInBytes() const {
-    return fInfo.fHeight * fRB;
+    return this->info().getSafeSize(fRB);
 }
 
 class SkScaledImageCacheDiscardableAllocator : public SkBitmap::Allocator {
@@ -278,7 +267,8 @@ private:
 bool SkScaledImageCacheDiscardableAllocator::allocPixelRef(SkBitmap* bitmap,
                                                        SkColorTable* ctable) {
     size_t size = bitmap->getSize();
-    if (0 == size) {
+    uint64_t size64 = bitmap->computeSize64();
+    if (0 == size || size64 > (uint64_t)size) {
         return false;
     }
 
@@ -287,18 +277,12 @@ bool SkScaledImageCacheDiscardableAllocator::allocPixelRef(SkBitmap* bitmap,
         return false;
     }
 
-    // can relax when we have bitmap::asImageInfo
-    if (SkBitmap::kARGB_8888_Config != bitmap->config()) {
+    // can we relax this?
+    if (kN32_SkColorType != bitmap->colorType()) {
         return false;
     }
 
-    SkImageInfo info = {
-        bitmap->width(),
-        bitmap->height(),
-        kPMColor_SkColorType,
-        bitmap->alphaType()
-    };
-
+    SkImageInfo info = bitmap->info();
     bitmap->setPixelRef(SkNEW_ARGS(SkOneShotDiscardablePixelRef,
                                    (info, dm, bitmap->rowBytes())))->unref();
     bitmap->lockPixels();
@@ -314,7 +298,7 @@ SkScaledImageCache::SkScaledImageCache(DiscardableFactory factory) {
 
 SkScaledImageCache::SkScaledImageCache(size_t byteLimit) {
     this->init();
-    fByteLimit = byteLimit;
+    fTotalByteLimit = byteLimit;
 }
 
 SkScaledImageCache::~SkScaledImageCache() {
@@ -368,10 +352,8 @@ static SkIRect get_bounds_from_bitmap(const SkBitmap& bm) {
     if (!(bm.pixelRef())) {
         return SkIRect::MakeEmpty();
     }
-    size_t x, y;
-    SkTDivMod(bm.pixelRefOffset(), bm.rowBytes(), &y, &x);
-    x >>= bm.shiftPerPixel();
-    return SkIRect::MakeXYWH(x, y, bm.width(), bm.height());
+    SkIPoint origin = bm.pixelRefOrigin();
+    return SkIRect::MakeXYWH(origin.fX, origin.fY, bm.width(), bm.height());
 }
 
 
@@ -428,7 +410,11 @@ SkScaledImageCache::ID* SkScaledImageCache::addAndLock(SkScaledImageCache::Rec* 
     SkASSERT(rec);
     // See if we already have this key (racy inserts, etc.)
     Rec* existing = this->findAndLock(rec->fKey);
-    if (existing != NULL) {
+    if (NULL != existing) {
+        // Since we already have a matching entry, just delete the new one and return.
+        // Call sites cannot assume the passed in object will live past this call.
+        existing->fBitmap = rec->fBitmap;
+        SkDELETE(rec);
         return rec_to_id(existing);
     }
 
@@ -517,10 +503,10 @@ void SkScaledImageCache::purgeAsNeeded() {
         byteLimit = SK_MaxU32;  // no limit based on bytes
     } else {
         countLimit = SK_MaxS32; // no limit based on count
-        byteLimit = fByteLimit;
+        byteLimit = fTotalByteLimit;
     }
 
-    size_t bytesUsed = fBytesUsed;
+    size_t bytesUsed = fTotalBytesUsed;
     int    countUsed = fCount;
 
     Rec* rec = fTail;
@@ -546,13 +532,13 @@ void SkScaledImageCache::purgeAsNeeded() {
         rec = prev;
     }
 
-    fBytesUsed = bytesUsed;
+    fTotalBytesUsed = bytesUsed;
     fCount = countUsed;
 }
 
-size_t SkScaledImageCache::setByteLimit(size_t newLimit) {
-    size_t prevLimit = fByteLimit;
-    fByteLimit = newLimit;
+size_t SkScaledImageCache::setTotalByteLimit(size_t newLimit) {
+    size_t prevLimit = fTotalByteLimit;
+    fTotalByteLimit = newLimit;
     if (newLimit < prevLimit) {
         this->purgeAsNeeded();
     }
@@ -612,7 +598,7 @@ void SkScaledImageCache::addToHead(Rec* rec) {
     if (!fTail) {
         fTail = rec;
     }
-    fBytesUsed += rec->bytesUsed();
+    fTotalBytesUsed += rec->bytesUsed();
     fCount += 1;
 
     this->validate();
@@ -624,14 +610,14 @@ void SkScaledImageCache::addToHead(Rec* rec) {
 void SkScaledImageCache::validate() const {
     if (NULL == fHead) {
         SkASSERT(NULL == fTail);
-        SkASSERT(0 == fBytesUsed);
+        SkASSERT(0 == fTotalBytesUsed);
         return;
     }
 
     if (fHead == fTail) {
         SkASSERT(NULL == fHead->fPrev);
         SkASSERT(NULL == fHead->fNext);
-        SkASSERT(fHead->bytesUsed() == fBytesUsed);
+        SkASSERT(fHead->bytesUsed() == fTotalBytesUsed);
         return;
     }
 
@@ -646,7 +632,7 @@ void SkScaledImageCache::validate() const {
     while (rec) {
         count += 1;
         used += rec->bytesUsed();
-        SkASSERT(used <= fBytesUsed);
+        SkASSERT(used <= fTotalBytesUsed);
         rec = rec->fNext;
     }
     SkASSERT(fCount == count);
@@ -676,8 +662,18 @@ void SkScaledImageCache::dump() const {
     }
 
     SkDebugf("SkScaledImageCache: count=%d bytes=%d locked=%d %s\n",
-             fCount, fBytesUsed, locked,
+             fCount, fTotalBytesUsed, locked,
              fDiscardableFactory ? "discardable" : "malloc");
+}
+
+size_t SkScaledImageCache::setSingleAllocationByteLimit(size_t newLimit) {
+    size_t oldLimit = fSingleAllocationByteLimit;
+    fSingleAllocationByteLimit = newLimit;
+    return oldLimit;
+}
+
+size_t SkScaledImageCache::getSingleAllocationByteLimit() const {
+    return fSingleAllocationByteLimit;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -685,21 +681,30 @@ void SkScaledImageCache::dump() const {
 #include "SkThread.h"
 
 SK_DECLARE_STATIC_MUTEX(gMutex);
-
-static void create_cache(SkScaledImageCache** cache) {
-#ifdef SK_USE_DISCARDABLE_SCALEDIMAGECACHE
-    *cache = SkNEW_ARGS(SkScaledImageCache, (SkDiscardableMemory::Create));
-#else
-    *cache = SkNEW_ARGS(SkScaledImageCache, (SK_DEFAULT_IMAGE_CACHE_LIMIT));
+static SkScaledImageCache* gScaledImageCache = NULL;
+static void cleanup_gScaledImageCache() {
+    // We'll clean this up in our own tests, but disable for clients.
+    // Chrome seems to have funky multi-process things going on in unit tests that
+    // makes this unsafe to delete when the main process atexit()s.
+    // SkLazyPtr does the same sort of thing.
+#if SK_DEVELOPER
+    SkDELETE(gScaledImageCache);
 #endif
 }
 
+/** Must hold gMutex when calling. */
 static SkScaledImageCache* get_cache() {
-    static SkScaledImageCache* gCache(NULL);
-    SK_DECLARE_STATIC_ONCE(create_cache_once);
-    SkOnce(&create_cache_once, create_cache, &gCache);
-    SkASSERT(NULL != gCache);
-    return gCache;
+    // gMutex is always held when this is called, so we don't need to be fancy in here.
+    gMutex.assertHeld();
+    if (NULL == gScaledImageCache) {
+#ifdef SK_USE_DISCARDABLE_SCALEDIMAGECACHE
+        gScaledImageCache = SkNEW_ARGS(SkScaledImageCache, (SkDiscardableMemory::Create));
+#else
+        gScaledImageCache = SkNEW_ARGS(SkScaledImageCache, (SK_DEFAULT_IMAGE_CACHE_LIMIT));
+#endif
+        atexit(cleanup_gScaledImageCache);
+    }
+    return gScaledImageCache;
 }
 
 
@@ -757,19 +762,19 @@ void SkScaledImageCache::Unlock(SkScaledImageCache::ID* id) {
 //    get_cache()->dump();
 }
 
-size_t SkScaledImageCache::GetBytesUsed() {
+size_t SkScaledImageCache::GetTotalBytesUsed() {
     SkAutoMutexAcquire am(gMutex);
-    return get_cache()->getBytesUsed();
+    return get_cache()->getTotalBytesUsed();
 }
 
-size_t SkScaledImageCache::GetByteLimit() {
+size_t SkScaledImageCache::GetTotalByteLimit() {
     SkAutoMutexAcquire am(gMutex);
-    return get_cache()->getByteLimit();
+    return get_cache()->getTotalByteLimit();
 }
 
-size_t SkScaledImageCache::SetByteLimit(size_t newLimit) {
+size_t SkScaledImageCache::SetTotalByteLimit(size_t newLimit) {
     SkAutoMutexAcquire am(gMutex);
-    return get_cache()->setByteLimit(newLimit);
+    return get_cache()->setTotalByteLimit(newLimit);
 }
 
 SkBitmap::Allocator* SkScaledImageCache::GetAllocator() {
@@ -782,18 +787,37 @@ void SkScaledImageCache::Dump() {
     get_cache()->dump();
 }
 
+size_t SkScaledImageCache::SetSingleAllocationByteLimit(size_t size) {
+    SkAutoMutexAcquire am(gMutex);
+    return get_cache()->setSingleAllocationByteLimit(size);
+}
+
+size_t SkScaledImageCache::GetSingleAllocationByteLimit() {
+    SkAutoMutexAcquire am(gMutex);
+    return get_cache()->getSingleAllocationByteLimit();
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "SkGraphics.h"
 
-size_t SkGraphics::GetImageCacheBytesUsed() {
-    return SkScaledImageCache::GetBytesUsed();
+size_t SkGraphics::GetImageCacheTotalBytesUsed() {
+    return SkScaledImageCache::GetTotalBytesUsed();
 }
 
-size_t SkGraphics::GetImageCacheByteLimit() {
-    return SkScaledImageCache::GetByteLimit();
+size_t SkGraphics::GetImageCacheTotalByteLimit() {
+    return SkScaledImageCache::GetTotalByteLimit();
 }
 
-size_t SkGraphics::SetImageCacheByteLimit(size_t newLimit) {
-    return SkScaledImageCache::SetByteLimit(newLimit);
+size_t SkGraphics::SetImageCacheTotalByteLimit(size_t newLimit) {
+    return SkScaledImageCache::SetTotalByteLimit(newLimit);
 }
+
+size_t SkGraphics::GetImageCacheSingleAllocationByteLimit() {
+    return SkScaledImageCache::GetSingleAllocationByteLimit();
+}
+
+size_t SkGraphics::SetImageCacheSingleAllocationByteLimit(size_t newLimit) {
+    return SkScaledImageCache::SetSingleAllocationByteLimit(newLimit);
+}
+

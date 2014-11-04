@@ -26,10 +26,7 @@ static void make_bitmap(int quarterWidth, int quarterHeight, SkBitmap *bitmap) {
     pAlphaGray.setColor(0x66888888);
 
     // Prepare bitmap, and a canvas that draws into it.
-    bitmap->reset();
-    bitmap->setConfig(SkBitmap::kARGB_8888_Config,
-                      quarterWidth*4, quarterHeight*4);
-    bitmap->allocPixels();
+    bitmap->allocN32Pixels(quarterWidth*4, quarterHeight*4);
     SkCanvas canvas(*bitmap);
 
     SkScalar w = SkIntToScalar(quarterWidth);
@@ -62,12 +59,16 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() {
         return SkString("bitmapscroll");
     }
 
     virtual SkISize onISize() {
-      return make_isize(800, 600);
+      return SkISize::Make(800, 600);
     }
 
     virtual void onDraw(SkCanvas* canvas) {
@@ -132,7 +133,7 @@ protected:
                 // scrollRect() should always return true, even if it's a no-op
                 SkBitmap scrolledBitmap;
                 SkDEBUGCODE(bool copyToReturnValue = )origBitmap.copyTo(
-                    &scrolledBitmap, origBitmap.config());
+                    &scrolledBitmap, origBitmap.colorType());
                 SkASSERT(copyToReturnValue);
                 SkDEBUGCODE(bool scrollRectReturnValue = )scrolledBitmap.scrollRect(
                     subset, scrollX * xMult, scrollY * yMult);

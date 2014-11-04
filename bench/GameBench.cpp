@@ -5,7 +5,7 @@
  * found in the LICENSE file.
  */
 
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkCanvas.h"
 #include "SkPaint.h"
 #include "SkRandom.h"
@@ -14,7 +14,7 @@
 
 // This bench simulates the calls Skia sees from various HTML5 canvas
 // game bench marks
-class GameBench : public SkBenchmark {
+class GameBench : public Benchmark {
 public:
     enum Type {
         kScale_Type,
@@ -190,9 +190,8 @@ protected:
 
             canvas->concat(mat);
             if (fUseAtlas) {
-                static int curCell = 0;
+                const int curCell = i % (kNumAtlasedX * kNumAtlasedY);
                 SkIRect src = fAtlasRects[curCell % (kNumAtlasedX)][curCell / (kNumAtlasedX)];
-                curCell = (curCell + 1) % (kNumAtlasedX*kNumAtlasedY);
 
                 if (fUseDrawVertices) {
                     SkPoint uvs[4] = {
@@ -249,9 +248,7 @@ private:
     void makeCheckerboard() {
         static int kCheckSize = 16;
 
-        fCheckerboard.setConfig(SkBitmap::kARGB_8888_Config,
-                                kCheckerboardWidth, kCheckerboardHeight);
-        fCheckerboard.allocPixels();
+        fCheckerboard.allocN32Pixels(kCheckerboardWidth, kCheckerboardHeight);
         SkAutoLockPixels lock(fCheckerboard);
         for (int y = 0; y < kCheckerboardHeight; ++y) {
             int even = (y / kCheckSize) % 2;
@@ -284,8 +281,7 @@ private:
             }
         }
 
-        fAtlas.setConfig(SkBitmap::kARGB_8888_Config, kTotAtlasWidth, kTotAtlasHeight);
-        fAtlas.allocPixels();
+        fAtlas.allocN32Pixels(kTotAtlasWidth, kTotAtlasHeight);
         SkAutoLockPixels lock(fAtlas);
 
         for (int y = 0; y < kTotAtlasHeight; ++y) {
@@ -308,7 +304,7 @@ private:
         }
     }
 
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 // Partial clear

@@ -60,19 +60,16 @@ static SkScalar drawCell(SkCanvas* canvas, SkXfermode* mode, SkAlpha a0, SkAlpha
 
 static SkShader* make_bg_shader() {
     SkBitmap bm;
-    bm.setConfig(SkBitmap::kARGB_8888_Config, 2, 2);
-    bm.allocPixels();
+    bm.allocN32Pixels(2, 2);
     *bm.getAddr32(0, 0) = *bm.getAddr32(1, 1) = 0xFFFFFFFF;
     *bm.getAddr32(1, 0) = *bm.getAddr32(0, 1) = SkPackARGB32(0xFF, 0xCC, 0xCC, 0xCC);
 
-    SkShader* s = SkShader::CreateBitmapShader(bm,
-                                               SkShader::kRepeat_TileMode,
-                                               SkShader::kRepeat_TileMode);
-
     SkMatrix m;
     m.setScale(SkIntToScalar(6), SkIntToScalar(6));
-    s->setLocalMatrix(m);
-    return s;
+    return SkShader::CreateBitmapShader(bm,
+                                        SkShader::kRepeat_TileMode,
+                                        SkShader::kRepeat_TileMode,
+                                        &m);
 }
 
 namespace skiagm {
@@ -81,12 +78,11 @@ namespace skiagm {
         SkPaint fBGPaint;
 
     protected:
-
         virtual SkString onShortName() SK_OVERRIDE {
             return SkString("hairmodes");
         }
 
-        virtual SkISize onISize() { return make_isize(640, 480); }
+        virtual SkISize onISize() { return SkISize::Make(640, 480); }
 
         virtual void onOnceBeforeDraw() SK_OVERRIDE {
             fBGPaint.setShader(make_bg_shader())->unref();
@@ -126,7 +122,7 @@ namespace skiagm {
         }
 
         // disable pdf for now, since it crashes on mac
-        virtual uint32_t onGetFlags() const { return kSkipPDF_Flag; }
+        virtual uint32_t onGetFlags() const { return kSkipPDF_Flag | kSkipTiled_Flag; }
 
     private:
         typedef GM INHERITED;

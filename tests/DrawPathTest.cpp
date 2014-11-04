@@ -5,37 +5,17 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
-#include "TestClassDef.h"
 #include "SkBitmap.h"
 #include "SkCanvas.h"
 #include "SkDashPathEffect.h"
 #include "SkSurface.h"
-
-static SkCanvas* create(SkBitmap::Config config, int w, int h, int rb,
-                        void* addr = NULL) {
-    SkBitmap bm;
-    bm.setConfig(config, w, h, rb);
-    if (addr) {
-        bm.setPixels(addr);
-    } else {
-        bm.allocPixels();
-    }
-    return new SkCanvas(bm);
-}
-
-static SkCanvas* new_canvas(int w, int h) {
-    return create(SkBitmap::kARGB_8888_Config, w, h, 0, NULL);
-}
-
-///////////////////////////////////////////////////////////////////////////////
+#include "Test.h"
 
 // test that we can draw an aa-rect at coordinates > 32K (bigger than fixedpoint)
 static void test_big_aa_rect(skiatest::Reporter* reporter) {
     SkBitmap output;
     SkPMColor pixel[1];
-    output.setConfig(SkBitmap::kARGB_8888_Config, 1, 1, 4);
-    output.setPixels(pixel);
+    output.installPixels(SkImageInfo::MakeN32Premul(1, 1), pixel, 4);
 
     SkSurface* surf = SkSurface::NewRasterPMColor(300, 33300);
     SkCanvas* canvas = surf->getCanvas();
@@ -114,7 +94,7 @@ static void test_crbug131181() {
     moveToH(&path, &data[0]);
     cubicToH(&path, &data[2]);
 
-    SkAutoTUnref<SkCanvas> canvas(new_canvas(640, 480));
+    SkAutoTUnref<SkCanvas> canvas(SkCanvas::NewRasterN32(640, 480));
 
     SkPaint paint;
     paint.setAntiAlias(true);
@@ -126,8 +106,7 @@ static void test_crbug131181() {
 // stepper for the quadratic. Now we bias that value by 1/2 so we don't overflow
 static void test_crbug_140803() {
     SkBitmap bm;
-    bm.setConfig(SkBitmap::kARGB_8888_Config, 2700, 30*1024);
-    bm.allocPixels();
+    bm.allocN32Pixels(2700, 30*1024);
     SkCanvas canvas(bm);
 
     SkPath path;
@@ -153,7 +132,7 @@ static void test_inversepathwithclip() {
 
     SkPaint paint;
 
-    SkAutoTUnref<SkCanvas> canvas(new_canvas(640, 480));
+    SkAutoTUnref<SkCanvas> canvas(SkCanvas::NewRasterN32(640, 480));
     canvas.get()->save();
     canvas.get()->clipRect(SkRect::MakeWH(SkIntToScalar(19), SkIntToScalar(11)));
 
@@ -181,7 +160,6 @@ static void test_inversepathwithclip() {
 }
 
 static void test_bug533() {
-#ifdef SK_SCALAR_IS_FLOAT
     /*
         http://code.google.com/p/skia/issues/detail?id=533
         This particular test/bug only applies to the float case, where the
@@ -194,9 +172,8 @@ static void test_bug533() {
     SkPaint paint;
     paint.setAntiAlias(true);
 
-    SkAutoTUnref<SkCanvas> canvas(new_canvas(640, 480));
+    SkAutoTUnref<SkCanvas> canvas(SkCanvas::NewRasterN32(640, 480));
     canvas.get()->drawPath(path, paint);
-#endif
 }
 
 static void test_crbug_140642() {
@@ -215,27 +192,21 @@ static void test_crbug_140642() {
            stroke-dashoffset="-248.135982067">
      */
 
-#ifdef SK_SCALAR_IS_FLOAT
     const SkScalar vals[] = { 27734, 35660, 2157846850.0f, 247 };
-    SkDashPathEffect dontAssert(vals, 4, -248.135982067f);
-#endif
+    SkAutoTUnref<SkDashPathEffect> dontAssert(SkDashPathEffect::Create(vals, 4, -248.135982067f));
 }
 
 static void test_crbug_124652() {
-#ifdef SK_SCALAR_IS_FLOAT
     /*
         http://code.google.com/p/chromium/issues/detail?id=124652
         This particular test/bug only applies to the float case, where
         large values can "swamp" small ones.
      */
     SkScalar intervals[2] = {837099584, 33450};
-    SkAutoTUnref<SkDashPathEffect> dash(
-        new SkDashPathEffect(intervals, 2, -10, false));
-#endif
+    SkAutoTUnref<SkDashPathEffect> dash(SkDashPathEffect::Create(intervals, 2, -10));
 }
 
 static void test_bigcubic() {
-#ifdef SK_SCALAR_IS_FLOAT
     SkPath path;
     path.moveTo(64, 3);
     path.cubicTo(-329936, -100000000, -329936, 100000000, 1153, 330003);
@@ -243,9 +214,8 @@ static void test_bigcubic() {
     SkPaint paint;
     paint.setAntiAlias(true);
 
-    SkAutoTUnref<SkCanvas> canvas(new_canvas(640, 480));
+    SkAutoTUnref<SkCanvas> canvas(SkCanvas::NewRasterN32(640, 480));
     canvas.get()->drawPath(path, paint);
-#endif
 }
 
 // we used to assert if the bounds of the device (clip) was larger than 32K
@@ -254,8 +224,7 @@ static void test_bigcubic() {
 static void test_giantaa() {
     const int W = 400;
     const int H = 400;
-    SkAutoTUnref<SkCanvas> canvas(new_canvas(33000, 10));
-    canvas.get()->clear(SK_ColorTRANSPARENT);
+    SkAutoTUnref<SkCanvas> canvas(SkCanvas::NewRasterN32(33000, 10));
 
     SkPaint paint;
     paint.setAntiAlias(true);
@@ -274,12 +243,12 @@ static void test_infinite_dash(skiatest::Reporter* reporter) {
     path.lineTo(5000000, 0);
 
     SkScalar intervals[] = { 0.2f, 0.2f };
-    SkDashPathEffect dash(intervals, 2, 0);
+    SkAutoTUnref<SkDashPathEffect> dash(SkDashPathEffect::Create(intervals, 2, 0));
 
     SkPath filteredPath;
     SkPaint paint;
     paint.setStyle(SkPaint::kStroke_Style);
-    paint.setPathEffect(&dash);
+    paint.setPathEffect(dash);
 
     paint.getFillPath(path, &filteredPath);
     // If we reach this, we passed.
@@ -294,15 +263,15 @@ static void test_crbug_165432(skiatest::Reporter* reporter) {
     path.lineTo(10000000, 0);
 
     SkScalar intervals[] = { 0.5f, 0.5f };
-    SkDashPathEffect dash(intervals, 2, 0);
+    SkAutoTUnref<SkDashPathEffect> dash(SkDashPathEffect::Create(intervals, 2, 0));
 
     SkPaint paint;
     paint.setStyle(SkPaint::kStroke_Style);
-    paint.setPathEffect(&dash);
+    paint.setPathEffect(dash);
 
     SkPath filteredPath;
     SkStrokeRec rec(paint);
-    REPORTER_ASSERT(reporter, !dash.filterPath(&filteredPath, path, &rec, NULL));
+    REPORTER_ASSERT(reporter, !dash->filterPath(&filteredPath, path, &rec, NULL));
     REPORTER_ASSERT(reporter, filteredPath.isEmpty());
 }
 

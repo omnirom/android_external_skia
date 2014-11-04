@@ -23,10 +23,12 @@
 
 // Position & KLM line eq values. These are the vertex attributes for Bezier curves. The last value
 // of the Vec4f is ignored.
+namespace {
 extern const GrVertexAttrib kAttribs[] = {
     {kVec2f_GrVertexAttribType, 0, kPosition_GrVertexAttribBinding},
-    {kVec4f_GrVertexAttribType, sizeof(GrPoint), kEffect_GrVertexAttribBinding}
+    {kVec4f_GrVertexAttribType, sizeof(SkPoint), kEffect_GrVertexAttribBinding}
 };
+}
 
 static inline SkScalar eval_line(const SkPoint& p, const SkScalar lineEq[3], SkScalar sign) {
     return sign * (lineEq[0] * p.fX + lineEq[1] * p.fY + lineEq[2]);
@@ -48,7 +50,7 @@ protected:
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        return make_isize(800, 800);
+        return SkISize::Make(800, 800);
     }
 
     virtual uint32_t onGetFlags() const SK_OVERRIDE {
@@ -58,8 +60,7 @@ protected:
 
 
     virtual void onDraw(SkCanvas* canvas) SK_OVERRIDE {
-        SkBaseDevice* device = canvas->getTopDevice();
-        GrRenderTarget* rt = device->accessRenderTarget();
+        GrRenderTarget* rt = canvas->internal_private_accessTopLayerRenderTarget();
         if (NULL == rt) {
             return;
         }
@@ -91,7 +92,21 @@ protected:
                 {rand.nextRangeF(0.f, w), rand.nextRangeF(0.f, h)},
                 {rand.nextRangeF(0.f, w), rand.nextRangeF(0.f, h)}
             };
-            for(int edgeType = kFillAA_GrBezierEdgeType; edgeType < 3; ++edgeType) {
+            for(int edgeType = 0; edgeType < kGrEffectEdgeTypeCnt; ++edgeType) {
+                SkAutoTUnref<GrEffectRef> effect;
+                {   // scope to contain GrTestTarget
+                    GrTestTarget tt;
+                    context->getTestTarget(&tt);
+                    if (NULL == tt.target()) {
+                        continue;
+                    }
+                    GrEffectEdgeType et = (GrEffectEdgeType)edgeType;
+                    effect.reset(GrCubicEffect::Create(et, *tt.target()->caps()));
+                    if (!effect) {
+                        continue;
+                    }
+                }
+
                 SkScalar x = SkScalarMul(col, w);
                 SkScalar y = SkScalarMul(row, h);
                 SkPoint controlPts[] = {
@@ -151,17 +166,10 @@ protected:
 
                     GrTestTarget tt;
                     context->getTestTarget(&tt);
-                    if (NULL == tt.target()) {
-                        continue;
-                    }
+                    SkASSERT(NULL != tt.target());
                     GrDrawState* drawState = tt.target()->drawState();
                     drawState->setVertexAttribs<kAttribs>(2);
 
-                    SkAutoTUnref<GrEffectRef> effect(GrCubicEffect::Create(
-                            GrBezierEdgeType(edgeType), *tt.target()->caps()));
-                    if (!effect) {
-                        continue;
-                    }
                     drawState->addCoverageEffect(effect, 1);
                     drawState->setRenderTarget(rt);
                     drawState->setColor(0xff000000);
@@ -200,7 +208,7 @@ protected:
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        return make_isize(800, 800);
+        return SkISize::Make(800, 800);
     }
 
     virtual uint32_t onGetFlags() const SK_OVERRIDE {
@@ -210,8 +218,7 @@ protected:
 
 
     virtual void onDraw(SkCanvas* canvas) SK_OVERRIDE {
-        SkBaseDevice* device = canvas->getTopDevice();
-        GrRenderTarget* rt = device->accessRenderTarget();
+        GrRenderTarget* rt = canvas->internal_private_accessTopLayerRenderTarget();
         if (NULL == rt) {
             return;
         }
@@ -243,7 +250,21 @@ protected:
                 {rand.nextRangeF(0.f, w), rand.nextRangeF(0.f, h)}
             };
             SkScalar weight = rand.nextRangeF(0.f, 2.f);
-            for(int edgeType = kFillAA_GrBezierEdgeType; edgeType < 3; ++edgeType) {
+            for(int edgeType = 0; edgeType < kGrEffectEdgeTypeCnt; ++edgeType) {
+                SkAutoTUnref<GrEffectRef> effect;
+                {   // scope to contain GrTestTarget
+                    GrTestTarget tt;
+                    context->getTestTarget(&tt);
+                    if (NULL == tt.target()) {
+                        continue;
+                    }
+                    GrEffectEdgeType et = (GrEffectEdgeType)edgeType;
+                    effect.reset(GrConicEffect::Create(et, *tt.target()->caps()));
+                    if (!effect) {
+                        continue;
+                    }
+                }
+
                 SkScalar x = SkScalarMul(col, w);
                 SkScalar y = SkScalarMul(row, h);
                 SkPoint controlPts[] = {
@@ -300,17 +321,10 @@ protected:
 
                     GrTestTarget tt;
                     context->getTestTarget(&tt);
-                    if (NULL == tt.target()) {
-                        continue;
-                    }
+                    SkASSERT(NULL != tt.target());
                     GrDrawState* drawState = tt.target()->drawState();
                     drawState->setVertexAttribs<kAttribs>(2);
 
-                    SkAutoTUnref<GrEffectRef> effect(GrConicEffect::Create(
-                            GrBezierEdgeType(edgeType), *tt.target()->caps()));
-                    if (!effect) {
-                        continue;
-                    }
                     drawState->addCoverageEffect(effect, 1);
                     drawState->setRenderTarget(rt);
                     drawState->setColor(0xff000000);
@@ -385,7 +399,7 @@ protected:
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        return make_isize(800, 800);
+        return SkISize::Make(800, 800);
     }
 
     virtual uint32_t onGetFlags() const SK_OVERRIDE {
@@ -395,8 +409,7 @@ protected:
 
 
     virtual void onDraw(SkCanvas* canvas) SK_OVERRIDE {
-        SkBaseDevice* device = canvas->getTopDevice();
-        GrRenderTarget* rt = device->accessRenderTarget();
+        GrRenderTarget* rt = canvas->internal_private_accessTopLayerRenderTarget();
         if (NULL == rt) {
             return;
         }
@@ -426,7 +439,21 @@ protected:
                 {rand.nextRangeF(0.f, w), rand.nextRangeF(0.f, h)},
                 {rand.nextRangeF(0.f, w), rand.nextRangeF(0.f, h)}
             };
-            for(int edgeType = kFillAA_GrBezierEdgeType; edgeType < 3; ++edgeType) {
+            for(int edgeType = 0; edgeType < kGrEffectEdgeTypeCnt; ++edgeType) {
+                SkAutoTUnref<GrEffectRef> effect;
+                {   // scope to contain GrTestTarget
+                    GrTestTarget tt;
+                    context->getTestTarget(&tt);
+                    if (NULL == tt.target()) {
+                        continue;
+                    }
+                    GrEffectEdgeType et = (GrEffectEdgeType)edgeType;
+                    effect.reset(GrQuadEffect::Create(et, *tt.target()->caps()));
+                    if (!effect) {
+                        continue;
+                    }
+                }
+
                 SkScalar x = SkScalarMul(col, w);
                 SkScalar y = SkScalarMul(row, h);
                 SkPoint controlPts[] = {
@@ -474,20 +501,14 @@ protected:
                                                   sizeof(Vertex));
 
                     GrPathUtils::QuadUVMatrix DevToUV(pts);
-                    DevToUV.apply<4, sizeof(Vertex), sizeof(GrPoint)>(verts);
+                    DevToUV.apply<4, sizeof(Vertex), sizeof(SkPoint)>(verts);
 
                     GrTestTarget tt;
                     context->getTestTarget(&tt);
-                    if (NULL == tt.target()) {
-                        continue;
-                    }
+                    SkASSERT(NULL != tt.target());
                     GrDrawState* drawState = tt.target()->drawState();
                     drawState->setVertexAttribs<kAttribs>(2);
-                    SkAutoTUnref<GrEffectRef> effect(GrQuadEffect::Create(
-                            GrBezierEdgeType(edgeType), *tt.target()->caps()));
-                    if (!effect) {
-                        continue;
-                    }
+
                     drawState->addCoverageEffect(effect, 1);
                     drawState->setRenderTarget(rt);
                     drawState->setColor(0xff000000);

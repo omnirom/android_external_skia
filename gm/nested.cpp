@@ -19,6 +19,10 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() SK_OVERRIDE {
         SkString name("nested");
         if (fDoAA) {
@@ -30,7 +34,7 @@ protected:
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        return make_isize(kImageWidth, kImageHeight);
+        return SkISize::Make(kImageWidth, kImageHeight);
     }
 
     enum Shapes {

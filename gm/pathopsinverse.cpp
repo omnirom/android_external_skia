@@ -36,8 +36,7 @@ protected:
 
     SkColor blend(SkColor one, SkColor two) {
         SkBitmap temp;
-        temp.setConfig(SkBitmap::kARGB_8888_Config, 1, 1);
-        temp.allocPixels();
+        temp.allocN32Pixels(1, 1);
         SkCanvas canvas(temp);
         canvas.drawColor(one);
         canvas.drawColor(two);
@@ -51,12 +50,16 @@ protected:
         paint->setColor(color);
     }
 
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;  // Only for 565.  8888 is fine.
+    }
+
     virtual SkString onShortName() SK_OVERRIDE {
         return SkString("pathopsinverse");
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        return make_isize(1200, 900);
+        return SkISize::Make(1200, 900);
     }
 
     virtual void onDraw(SkCanvas* canvas) SK_OVERRIDE {

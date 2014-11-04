@@ -5,13 +5,13 @@
  * found in the LICENSE file.
  */
 
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkCanvas.h"
+#include "SkMorphologyImageFilter.h"
 #include "SkPaint.h"
 #include "SkRandom.h"
 #include "SkShader.h"
 #include "SkString.h"
-#include "SkMorphologyImageFilter.h"
 
 #define SMALL   SkIntToScalar(2)
 #define REAL    1.5f
@@ -27,7 +27,7 @@ static const char* gStyleName[] = {
     "dilate"
 };
 
-class MorphologyBench : public SkBenchmark {
+class MorphologyBench : public Benchmark {
     SkScalar       fRadius;
     MorphologyType fStyle;
     SkString       fName;
@@ -41,7 +41,7 @@ public:
         if (SkScalarFraction(rad) != 0) {
             fName.printf("morph_%.2f_%s", SkScalarToFloat(rad), name);
         } else {
-            fName.printf("morph_%d_%s", SkScalarRound(rad), name);
+            fName.printf("morph_%d_%s", SkScalarRoundToInt(rad), name);
         }
     }
 
@@ -66,12 +66,12 @@ protected:
                 SkMorphologyImageFilter* mf = NULL;
                 switch (fStyle) {
                 case kDilate_MT:
-                    mf = new SkDilateImageFilter(SkScalarFloorToInt(fRadius),
-                                                 SkScalarFloorToInt(fRadius));
+                    mf = SkDilateImageFilter::Create(SkScalarFloorToInt(fRadius),
+                                                    SkScalarFloorToInt(fRadius));
                     break;
                 case kErode_MT:
-                    mf = new SkErodeImageFilter(SkScalarFloorToInt(fRadius),
-                                                SkScalarFloorToInt(fRadius));
+                    mf = SkErodeImageFilter::Create(SkScalarFloorToInt(fRadius),
+                                                    SkScalarFloorToInt(fRadius));
                     break;
                 }
                 paint.setImageFilter(mf)->unref();
@@ -81,12 +81,9 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
-// Fixed point can be 100x slower than float on these tests, causing
-// bench to timeout.
-#ifndef SK_SCALAR_IS_FIXED
 DEF_BENCH( return new MorphologyBench(SMALL, kErode_MT); )
 DEF_BENCH( return new MorphologyBench(SMALL, kDilate_MT); )
 
@@ -97,4 +94,3 @@ DEF_BENCH( return new MorphologyBench(REAL, kErode_MT); )
 DEF_BENCH( return new MorphologyBench(REAL, kDilate_MT); )
 
 DEF_BENCH( return new MorphologyBench(0, kErode_MT); )
-#endif

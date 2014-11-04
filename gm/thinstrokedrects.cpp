@@ -17,12 +17,16 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() SK_OVERRIDE {
         return SkString("thinstrokedrects");
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        return make_isize(240, 320);
+        return SkISize::Make(240, 320);
     }
 
     virtual void onDraw(SkCanvas* canvas) SK_OVERRIDE {

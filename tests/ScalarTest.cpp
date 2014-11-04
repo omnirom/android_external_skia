@@ -5,13 +5,25 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
-#include "TestClassDef.h"
 #include "SkFloatingPoint.h"
 #include "SkMath.h"
 #include "SkPoint.h"
 #include "SkRandom.h"
 #include "SkRect.h"
+#include "Test.h"
+
+static void test_roundtoint(skiatest::Reporter* reporter) {
+    SkScalar x = 0.49999997f;
+    int ix = SkScalarRoundToInt(x);
+    // We "should" get 0, since x < 0.5, but we don't due to float addition rounding up the low
+    // bit after adding 0.5.
+    REPORTER_ASSERT(reporter, 1 == ix);
+
+    // This version explicitly performs the +0.5 step using double, which should avoid losing the
+    // low bits.
+    ix = SkDScalarRoundToInt(x);
+    REPORTER_ASSERT(reporter, 0 == ix);
+}
 
 struct PointSet {
     const SkPoint* fPts;
@@ -20,7 +32,6 @@ struct PointSet {
 };
 
 static void test_isRectFinite(skiatest::Reporter* reporter) {
-#ifdef SK_SCALAR_IS_FLOAT
     static const SkPoint gF0[] = {
         { 0, 0 }, { 1, 1 }
     };
@@ -61,7 +72,6 @@ static void test_isRectFinite(skiatest::Reporter* reporter) {
         bool rectIsFinite = !r.isEmpty();
         REPORTER_ASSERT(reporter, gSets[i].fIsFinite == rectIsFinite);
     }
-#endif
 }
 
 static bool isFinite_int(float x) {
@@ -190,4 +200,5 @@ static void test_isfinite(skiatest::Reporter* reporter) {
 
 DEF_TEST(Scalar, reporter) {
     test_isfinite(reporter);
+    test_roundtoint(reporter);
 }

@@ -7,33 +7,13 @@
 
 #include "gm.h"
 
-#if SK_SUPPORT_GPU
-#include "SkGpuDevice.h"
-#else
-class GrContext;
-#endif
-
-static void make_bitmap(SkBitmap* bitmap, GrContext* ctx, SkIRect* center) {
-    SkBaseDevice* dev;
-
+static void make_bitmap(SkBitmap* bitmap, SkIRect* center) {
     const int kFixed = 28;
     const int kStretchy = 8;
     const int kSize = 2*kFixed + kStretchy;
 
-#if SK_SUPPORT_GPU
-    if (ctx) {
-        dev = new SkGpuDevice(ctx, SkBitmap::kARGB_8888_Config, kSize, kSize);
-        *bitmap = dev->accessBitmap(false);
-    } else
-#endif
-    {
-        bitmap->setConfig(SkBitmap::kARGB_8888_Config, kSize, kSize);
-        bitmap->allocPixels();
-        dev = new SkBitmapDevice(*bitmap);
-    }
-
-    SkCanvas canvas(dev);
-    dev->unref();
+    bitmap->allocN32Pixels(kSize, kSize);
+    SkCanvas canvas(*bitmap);
     canvas.clear(SK_ColorTRANSPARENT);
 
     SkRect r = SkRect::MakeWH(SkIntToScalar(kSize), SkIntToScalar(kSize));
@@ -64,18 +44,22 @@ public:
     NinePatchStretchGM() {}
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() {
         return SkString("ninepatch-stretch");
     }
 
     virtual SkISize onISize() {
-        return make_isize(400, 400);
+        return SkISize::Make(400, 400);
     }
 
     virtual void onDraw(SkCanvas* canvas) {
         SkBitmap bm;
         SkIRect center;
-        make_bitmap(&bm, NULL /*SampleCode::GetGr()*/, &center);
+        make_bitmap(&bm, &center);
 
         // amount of bm that should not be stretched (unless we have to)
         const SkScalar fixed = SkIntToScalar(bm.width() - center.width());

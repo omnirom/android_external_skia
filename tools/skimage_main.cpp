@@ -117,7 +117,7 @@ static SkTArray<SkString, false> gMissingSubsetExpectations;
 static SkTArray<SkString, false> gKnownFailures;
 static SkTArray<SkString, false> gKnownSubsetFailures;
 
-static SkBitmap::Config gPrefConfig(SkBitmap::kNo_Config);
+static SkColorType gPrefColorType(kUnknown_SkColorType);
 
 // Expections read from a file specified by readExpectationsPath. The expectations must have been
 // previously written using createExpectationsPath.
@@ -164,7 +164,7 @@ static bool write_bitmap(const char outDir[], const char src[],
         return true;
     }
 
-    if (bm.config() == SkBitmap::kARGB_8888_Config) {
+    if (bm.colorType() == kN32_SkColorType) {
         // First attempt at encoding failed, and the bitmap was already 8888. Making
         // a copy is not going to help.
         return false;
@@ -172,7 +172,7 @@ static bool write_bitmap(const char outDir[], const char src[],
 
     // Encoding failed. Copy to 8888 and try again.
     SkBitmap bm8888;
-    if (!bm.copyTo(&bm8888, SkBitmap::kARGB_8888_Config)) {
+    if (!bm.copyTo(&bm8888, kN32_SkColorType)) {
         return false;
     }
     return SkImageEncoder::EncodeFile(filename.c_str(), bm8888, SkImageEncoder::kPNG_Type, 100);
@@ -445,7 +445,7 @@ static void test_stream_without_length(const char srcPath[], SkImageDecoder* cod
     // path should never fail.
     SkASSERT(stream.isValid());
     SkBitmap bm;
-    if (!codec->decode(&stream, &bm, gPrefConfig, SkImageDecoder::kDecodePixels_Mode)) {
+    if (!codec->decode(&stream, &bm, gPrefColorType, SkImageDecoder::kDecodePixels_Mode)) {
         gDecodeFailures.push_back().appendf("Without using getLength, %s failed to decode\n",
                                             srcPath);
         return;
@@ -464,8 +464,11 @@ static void test_stream_without_length(const char srcPath[], SkImageDecoder* cod
 #endif // defined(SK_BUILD_FOR_ANDROID) || defined(SK_BUILD_FOR_UNIX)
 
 /**
- *  Replace all instances of oldChar with newChar in str.
- *  TODO: Add this function to SkString and write tests for it.
+ * Replaces all instances of oldChar with newChar in str.
+ *
+ * TODO: This function appears here and in picture_utils.[cpp|h] ;
+ * we should add the implementation to src/core/SkString.cpp, write tests for it,
+ * and remove it from elsewhere.
  */
 static void replace_char(SkString* str, const char oldChar, const char newChar) {
     if (NULL == str) {
@@ -507,8 +510,7 @@ static void decodeFileAndWrite(const char srcPath[], const SkString* writePath) 
     replace_char(&basename, '.', '-');
     const char* filename = basename.c_str();
 
-    if (!codec->decode(&stream, &bitmap, gPrefConfig,
-                       SkImageDecoder::kDecodePixels_Mode)) {
+    if (!codec->decode(&stream, &bitmap, gPrefColorType, SkImageDecoder::kDecodePixels_Mode)) {
         if (NULL != gJsonExpectations.get()) {
             const SkString name_config = create_json_key(filename);
             skiagm::Expectations jsExpectations = gJsonExpectations->get(name_config.c_str());
@@ -592,9 +594,9 @@ static void decodeFileAndWrite(const char srcPath[], const SkString* writePath) 
                 SkBitmap bitmapFromDecodeSubset;
                 // FIXME: Come up with a more representative set of rectangles.
                 SkIRect rect = generate_random_rect(&rand, width, height);
-                SkString subsetDim = SkStringPrintf("[%d,%d,%d,%d]", rect.fLeft, rect.fTop,
+                SkString subsetDim = SkStringPrintf("%d_%d_%d_%d", rect.fLeft, rect.fTop,
                                                     rect.fRight, rect.fBottom);
-                if (codec->decodeSubset(&bitmapFromDecodeSubset, rect, gPrefConfig)) {
+                if (codec->decodeSubset(&bitmapFromDecodeSubset, rect, gPrefColorType)) {
                     SkString subsetName = SkStringPrintf("%s-%s", filename, subsetDim.c_str());
                     skiagm::BitmapAndDigest subsetBitmapAndDigest(bitmapFromDecodeSubset);
                     if (compare_to_expectations_if_necessary(subsetBitmapAndDigest.fDigest,
@@ -624,7 +626,7 @@ static void decodeFileAndWrite(const char srcPath[], const SkString* writePath) 
     }
 
     // Do not attempt to re-encode A8, since our image encoders do not support encoding to A8.
-    if (FLAGS_reencode && bitmap.config() != SkBitmap::kA8_Config) {
+    if (FLAGS_reencode && bitmap.colorType() != kAlpha_8_SkColorType) {
         // Encode to the format the file was originally in, or PNG if the encoder for the same
         // format is unavailable.
         SkImageDecoder::Format format = codec->getFormat();
@@ -681,9 +683,9 @@ static void decodeFileAndWrite(const char srcPath[], const SkString* writePath) 
         SkMemoryStream memStream(data);
         SkBitmap redecodedBitmap;
         SkImageDecoder::Format formatOnSecondDecode;
-        if (SkImageDecoder::DecodeStream(&memStream, &redecodedBitmap, gPrefConfig,
-                                          SkImageDecoder::kDecodePixels_Mode,
-                                          &formatOnSecondDecode)) {
+        if (SkImageDecoder::DecodeStream(&memStream, &redecodedBitmap, gPrefColorType,
+                                         SkImageDecoder::kDecodePixels_Mode,
+                                         &formatOnSecondDecode)) {
             SkASSERT(format_to_type(formatOnSecondDecode) == type);
         } else {
             gDecodeFailures.push_back().printf("Failed to redecode %s after reencoding to '%s'",
@@ -769,11 +771,11 @@ int tool_main(int argc, char** argv) {
         // Only consider the first config specified on the command line.
         const char* config = FLAGS_config[0];
         if (0 == strcmp(config, "8888")) {
-            gPrefConfig = SkBitmap::kARGB_8888_Config;
+            gPrefColorType = kN32_SkColorType;
         } else if (0 == strcmp(config, "565")) {
-            gPrefConfig = SkBitmap::kRGB_565_Config;
+            gPrefColorType = kRGB_565_SkColorType;
         } else if (0 == strcmp(config, "A8")) {
-            gPrefConfig = SkBitmap::kA8_Config;
+            gPrefColorType = kAlpha_8_SkColorType;
         } else if (0 != strcmp(config, "None")) {
             SkDebugf("Invalid preferred config\n");
             return -1;

@@ -32,7 +32,7 @@ protected:
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        return make_isize(630, 1215);
+        return SkISize::Make(630, 1215);
     }
 
     virtual void onDrawBackground(SkCanvas* canvas) SK_OVERRIDE {
@@ -152,7 +152,7 @@ private:
 
         SkCanvas* modeCanvas;
         if (NULL == layerCanvas) {
-            canvas->saveLayer(&r, NULL, SkCanvas::kARGB_ClipLayer_SaveFlag);
+            canvas->saveLayer(&r, NULL);
             modeCanvas = canvas;
         } else {
             modeCanvas = layerCanvas;
@@ -168,8 +168,11 @@ private:
         if (NULL == layerCanvas) {
             canvas->restore();
         } else {
-            SkBitmap bitmap = layerCanvas->getDevice()->accessBitmap(false);
-            canvas->drawBitmap(bitmap, 0, 0);
+            SkAutoROCanvasPixels ropixels(layerCanvas);
+            SkBitmap bitmap;
+            if (ropixels.asROBitmap(&bitmap)) {
+                canvas->drawBitmap(bitmap, 0, 0);
+            }
         }
 
         r.inset(-SK_ScalarHalf, -SK_ScalarHalf);
@@ -188,17 +191,16 @@ private:
             SkPackARGB32(0xFF, 0x40, 0x40, 0x40)
         };
         SkBitmap bg;
-        bg.setConfig(SkBitmap::kARGB_8888_Config, 2, 2, 0, kOpaque_SkAlphaType);
-        bg.allocPixels();
+        bg.allocN32Pixels(2, 2, true);
         SkAutoLockPixels bgAlp(bg);
         memcpy(bg.getPixels(), kCheckData, sizeof(kCheckData));
 
-        fBGShader.reset(SkShader::CreateBitmapShader(bg,
-                                                     SkShader::kRepeat_TileMode,
-                                                     SkShader::kRepeat_TileMode));
         SkMatrix lm;
         lm.setScale(SkIntToScalar(kCheckSize), SkIntToScalar(kCheckSize));
-        fBGShader->setLocalMatrix(lm);
+        fBGShader.reset(SkShader::CreateBitmapShader(bg,
+                                                     SkShader::kRepeat_TileMode,
+                                                     SkShader::kRepeat_TileMode,
+                                                     &lm));
 
         SkPaint bmpPaint;
         static const SkPoint kCenter = { SkIntToScalar(kSize) / 2, SkIntToScalar(kSize) / 2 };
@@ -212,8 +214,7 @@ private:
                                                           SkShader::kRepeat_TileMode))->unref();
 
         SkBitmap bmp;
-        bmp.setConfig(SkBitmap::kARGB_8888_Config, kSize, kSize);
-        bmp.allocPixels();
+        bmp.allocN32Pixels(kSize, kSize);
         SkCanvas bmpCanvas(bmp);
 
         bmpCanvas.clear(SK_ColorTRANSPARENT);

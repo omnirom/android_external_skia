@@ -21,7 +21,7 @@ bool SkDifferentPixelsMetric::diff(SkBitmap* baseline, SkBitmap* test, bool comp
     // Ensure the images are comparable
     if (baseline->width() != test->width() || baseline->height() != test->height() ||
         baseline->width() <= 0 || baseline->height() <= 0 ||
-        baseline->config() != test->config()) {
+        baseline->colorType() != test->colorType()) {
         return false;
     }
 
@@ -30,9 +30,7 @@ bool SkDifferentPixelsMetric::diff(SkBitmap* baseline, SkBitmap* test, bool comp
 
     // Prepare the POI alpha mask if needed
     if (computeMask) {
-        result->poiAlphaMask.setConfig(SkBitmap::kA8_Config, width, height);
-        result->poiAlphaMask.allocPixels();
-        result->poiAlphaMask.lockPixels();
+        result->poiAlphaMask.allocPixels(SkImageInfo::MakeA8(width, height));
         result->poiAlphaMask.eraseARGB(SK_AlphaOPAQUE, 0, 0, 0);
     }
 

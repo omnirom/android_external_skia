@@ -1,4 +1,5 @@
 #include <cmath>
+#include <math.h>
 
 #include "SkBitmap.h"
 #include "skpdiff_util.h"
@@ -125,8 +126,8 @@ static void adobergb_to_cielab(float r, float g, float b, LAB* lab) {
 /// Converts a 8888 bitmap to LAB color space and puts it into the output
 static bool bitmap_to_cielab(const SkBitmap* bitmap, ImageLAB* outImageLAB) {
     SkBitmap bm8888;
-    if (bitmap->config() != SkBitmap::kARGB_8888_Config) {
-        if (!bitmap->copyTo(&bm8888, SkBitmap::kARGB_8888_Config)) {
+    if (bitmap->colorType() != kN32_SkColorType) {
+        if (!bitmap->copyTo(&bm8888, kN32_SkColorType)) {
             return false;
         }
         bitmap = &bm8888;
@@ -159,10 +160,12 @@ static bool bitmap_to_cielab(const SkBitmap* bitmap, ImageLAB* outImageLAB) {
 static float contrast_sensitivity(float cyclesPerDegree, float luminance) {
     float a = 440.0f * powf(1.0f + 0.7f / luminance, -0.2f);
     float b = 0.3f * powf(1.0f + 100.0f / luminance, 0.15f);
-    return a *
-           cyclesPerDegree *
-           expf(-b * cyclesPerDegree) *
-           sqrtf(1.0f + 0.06f * expf(b * cyclesPerDegree));
+    float exp = expf(-b * cyclesPerDegree);
+    float root = sqrtf(1.0f + 0.06f * expf(b * cyclesPerDegree));
+    if (!SkScalarIsFinite(exp)  || !SkScalarIsFinite(root)) {
+        return 0;
+    }
+    return a * cyclesPerDegree * exp * root;
 }
 
 #if 0

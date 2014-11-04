@@ -25,12 +25,16 @@ public:
     StrokeRectsGM() {}
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() {
         return SkString("strokerects");
     }
 
     virtual SkISize onISize() {
-        return make_isize(W*2, H*2);
+        return SkISize::Make(W*2, H*2);
     }
 
     static void rnd_rect(SkRect* r, SkLCGRandom& rand) {

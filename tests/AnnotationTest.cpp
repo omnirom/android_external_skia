@@ -5,13 +5,12 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "Test.h"
-#include "TestClassDef.h"
 #include "SkAnnotation.h"
-#include "SkData.h"
 #include "SkCanvas.h"
+#include "SkData.h"
 #include "SkPDFDevice.h"
 #include "SkPDFDocument.h"
+#include "Test.h"
 
 /** Returns true if data (may contain null characters) contains needle (null
  *  terminated). */
@@ -27,8 +26,7 @@ static bool ContainsString(const char* data, size_t dataSize, const char* needle
 
 DEF_TEST(Annotation_NoDraw, reporter) {
     SkBitmap bm;
-    bm.setConfig(SkBitmap::kARGB_8888_Config, 10, 10);
-    bm.allocPixels();
+    bm.allocN32Pixels(10, 10);
     bm.eraseColor(SK_ColorTRANSPARENT);
 
     SkCanvas canvas(bm);

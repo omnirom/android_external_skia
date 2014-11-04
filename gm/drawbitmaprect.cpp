@@ -16,8 +16,7 @@ namespace skiagm {
 
 static SkBitmap make_chessbm(int w, int h) {
     SkBitmap bm;
-    bm.setConfig(SkBitmap::kARGB_8888_Config , w, h);
-    bm.allocPixels();
+    bm.allocN32Pixels(w, h);
 
     for (int y = 0; y < bm.height(); y++) {
         uint32_t* p = bm.getAddr32(0, y);
@@ -29,9 +28,8 @@ static SkBitmap make_chessbm(int w, int h) {
     return bm;
 }
 
-static void makebm(SkBitmap* bm, SkBitmap::Config config, int w, int h) {
-    bm->setConfig(config, w, h);
-    bm->allocPixels();
+static void makebm(SkBitmap* bm, int w, int h) {
+    bm->allocN32Pixels(w, h);
     bm->eraseColor(SK_ColorTRANSPARENT);
 
     SkCanvas    canvas(*bm);
@@ -57,19 +55,21 @@ static void makebm(SkBitmap* bm, SkBitmap::Config config, int w, int h) {
                          SK_Scalar1};
 
     SkPaint     paint;
-    paint.setShader(SkGradientShader::CreateRadial(
-                    pt, radius,
-                    colors, pos,
-                    SK_ARRAY_COUNT(colors),
-                    SkShader::kRepeat_TileMode))->unref();
     SkRect rect = SkRect::MakeWH(wScalar, hScalar);
     SkMatrix mat = SkMatrix::I();
     for (int i = 0; i < 4; ++i) {
-        paint.getShader()->setLocalMatrix(mat);
+        paint.setShader(SkGradientShader::CreateRadial(
+                        pt, radius,
+                        colors, pos,
+                        SK_ARRAY_COUNT(colors),
+                        SkShader::kRepeat_TileMode,
+                        0, &mat))->unref();
         canvas.drawRect(rect, paint);
         rect.inset(wScalar / 8, hScalar / 8);
         mat.postScale(SK_Scalar1 / 4, SK_Scalar1 / 4);
     }
+    // Let backends know we won't change this, so they don't have to deep copy it defensively.
+    bm->setImmutable();
 }
 
 static const int gSize = 1024;
@@ -86,14 +86,12 @@ protected:
         return SkString("drawbitmaprect");
     }
 
-    SkISize onISize() { return make_isize(gSize, gSize); }
+    SkISize onISize() { return SkISize::Make(gSize, gSize); }
 
     virtual void onDraw(SkCanvas* canvas) {
         static const int kBmpSize = 2048;
         if (fLargeBitmap.isNull()) {
-            makebm(&fLargeBitmap,
-                   SkBitmap::kARGB_8888_Config,
-                   kBmpSize, kBmpSize);
+            makebm(&fLargeBitmap, kBmpSize, kBmpSize);
         }
         SkRect dstRect = { 0, 0, SkIntToScalar(64), SkIntToScalar(64)};
         static const int kMaxSrcRectSize = 1 << (SkNextLog2(kBmpSize) + 2);
@@ -167,7 +165,7 @@ protected:
 
             srcRect.setXYWH(1, 1, 3, 3);
             SkMaskFilter* mf = SkBlurMaskFilter::Create(
-                SkBlurMaskFilter::kNormal_BlurStyle,
+                kNormal_SkBlurStyle,
                 SkBlurMask::ConvertRadiusToSigma(SkIntToScalar(5)),
                 SkBlurMaskFilter::kHighQuality_BlurFlag |
                 SkBlurMaskFilter::kIgnoreTransform_BlurFlag);
@@ -182,8 +180,6 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef SK_BUILD_FOR_ANDROID
 static GM* MyFactory(void*) { return new DrawBitmapRectGM; }
 static GMRegistry reg(MyFactory);
-#endif
 }

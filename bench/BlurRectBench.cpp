@@ -5,13 +5,13 @@
  * found in the LICENSE file.
  */
 
-#include "SkBenchmark.h"
+#include "Benchmark.h"
+#include "SkBlurMask.h"
 #include "SkCanvas.h"
 #include "SkPaint.h"
 #include "SkRandom.h"
 #include "SkShader.h"
 #include "SkString.h"
-#include "SkBlurMask.h"
 
 #define SMALL   SkIntToScalar(2)
 #define REAL    1.5f
@@ -20,7 +20,7 @@ static const SkScalar kMedium = SkIntToScalar(5);
 static const SkScalar kMedBig = SkIntToScalar(20);
 #define REALBIG 30.5f
 
-class BlurRectBench: public SkBenchmark {
+class BlurRectBench: public Benchmark {
     int         fLoopCount;
     SkScalar    fRadius;
     SkString    fName;
@@ -70,7 +70,7 @@ protected:
     virtual void makeBlurryRect(const SkRect&) = 0;
     virtual void preBenchSetup(const SkRect&) {}
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 
@@ -91,7 +91,7 @@ protected:
     virtual void makeBlurryRect(const SkRect& r) SK_OVERRIDE {
         SkMask mask;
         SkBlurMask::BlurRect(SkBlurMask::ConvertRadiusToSigma(this->radius()),
-                             &mask, r, SkBlurMask::kNormal_Style);
+                             &mask, r, kNormal_SkBlurStyle);
         SkMask::FreeImage(mask.fImage);
     }
 private:
@@ -146,8 +146,7 @@ protected:
         SkMask mask;
         mask.fImage = NULL;
         SkBlurMask::BoxBlur(&mask, fSrcMask, SkBlurMask::ConvertRadiusToSigma(this->radius()),
-                            SkBlurMask::kNormal_Style,
-                            SkBlurMask::kHigh_Quality);
+                            kNormal_SkBlurStyle, kHigh_SkBlurQuality);
         SkMask::FreeImage(mask.fImage);
     }
 private:
@@ -174,7 +173,7 @@ protected:
         SkMask mask;
         mask.fImage = NULL;
         SkBlurMask::BlurGroundTruth(SkBlurMask::ConvertRadiusToSigma(this->radius()),
-                                    &mask, fSrcMask, SkBlurMask::kNormal_Style);
+                                    &mask, fSrcMask, kNormal_SkBlurStyle);
         SkMask::FreeImage(mask.fImage);
     }
 private:

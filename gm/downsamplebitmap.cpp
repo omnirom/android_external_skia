@@ -6,8 +6,9 @@
  */
 
 #include "gm.h"
-#include "SkGradientShader.h"
 
+#include "Resources.h"
+#include "SkGradientShader.h"
 #include "SkTypeface.h"
 #include "SkImageDecoder.h"
 #include "SkStream.h"
@@ -18,7 +19,6 @@ static void setTypeface(SkPaint* paint, const char name[], SkTypeface::Style sty
 }
 
 class DownsampleBitmapGM : public skiagm::GM {
-
 public:
     SkBitmap    fBM;
     SkString    fName;
@@ -40,6 +40,13 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        if (SkPaint::kHigh_FilterLevel != fFilterLevel) {
+            return kSkipTiled_Flag;
+        }
+        return 0;
+    }
+
     virtual SkString onShortName() SK_OVERRIDE {
         return fName;
     }
@@ -99,8 +106,7 @@ class DownsampleBitmapTextGM: public DownsampleBitmapGM {
       float fTextSize;
 
       virtual void make_bitmap() SK_OVERRIDE {
-          fBM.setConfig(SkBitmap::kARGB_8888_Config, int(fTextSize * 8), int(fTextSize * 6));
-          fBM.allocPixels();
+          fBM.allocN32Pixels(int(fTextSize * 8), int(fTextSize * 6));
           SkCanvas canvas(fBM);
           canvas.drawColor(SK_ColorWHITE);
 
@@ -135,9 +141,7 @@ class DownsampleBitmapCheckerboardGM: public DownsampleBitmapGM {
       int fNumChecks;
 
       virtual void make_bitmap() SK_OVERRIDE {
-          fBM.setConfig(SkBitmap::kARGB_8888_Config, fSize, fSize);
-          fBM.allocPixels();
-          SkAutoLockPixels lock(fBM);
+          fBM.allocN32Pixels(fSize, fSize);
           for (int y = 0; y < fSize; ++y) {
               for (int x = 0; x < fSize; ++x) {
                   SkPMColor* s = fBM.getAddr32(x, y);
@@ -168,23 +172,21 @@ class DownsampleBitmapImageGM: public DownsampleBitmapGM {
       int fSize;
 
       virtual void make_bitmap() SK_OVERRIDE {
-          SkString path(skiagm::GM::gResourcePath);
-          path.append("/");
-          path.append(fFilename);
+          SkString resourcePath = GetResourcePath();
+          resourcePath.append("/");
+          resourcePath.append(fFilename);
 
-          SkImageDecoder *codec = NULL;
-          SkFILEStream stream(path.c_str());
+          SkImageDecoder* codec = NULL;
+          SkFILEStream stream(resourcePath.c_str());
           if (stream.isValid()) {
               codec = SkImageDecoder::Factory(&stream);
           }
           if (codec) {
               stream.rewind();
-              codec->decode(&stream, &fBM, SkBitmap::kARGB_8888_Config,
-                  SkImageDecoder::kDecodePixels_Mode);
+              codec->decode(&stream, &fBM, kN32_SkColorType, SkImageDecoder::kDecodePixels_Mode);
               SkDELETE(codec);
           } else {
-              fBM.setConfig(SkBitmap::kARGB_8888_Config, 1, 1);
-              fBM.allocPixels();
+              fBM.allocN32Pixels(1, 1);
               *(fBM.getAddr32(0,0)) = 0xFF0000FF; // red == bad
           }
           fSize = fBM.height();

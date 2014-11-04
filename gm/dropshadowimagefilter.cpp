@@ -54,8 +54,7 @@ static void draw_bitmap(SkCanvas* canvas, const SkRect& r, SkImageFilter* imf) {
     r.roundOut(&bounds);
 
     SkBitmap bm;
-    bm.setConfig(SkBitmap::kARGB_8888_Config, bounds.width(), bounds.height());
-    bm.allocPixels();
+    bm.allocN32Pixels(bounds.width(), bounds.height());
     bm.eraseColor(SK_ColorTRANSPARENT);
     SkCanvas c(bm);
     draw_path(&c, r, NULL);
@@ -74,8 +73,7 @@ static void draw_sprite(SkCanvas* canvas, const SkRect& r, SkImageFilter* imf) {
     r.roundOut(&bounds);
 
     SkBitmap bm;
-    bm.setConfig(SkBitmap::kARGB_8888_Config, bounds.width(), bounds.height());
-    bm.allocPixels();
+    bm.allocN32Pixels(bounds.width(), bounds.height());
     bm.eraseColor(SK_ColorRED);
     SkCanvas c(bm);
 
@@ -117,7 +115,7 @@ protected:
         // from scaled replay tests because drawSprite ignores the
         // reciprocal scale that is applied at record time, which is
         // the intended behavior of drawSprite.
-        return kSkipScaledReplay_Flag;
+        return kSkipScaledReplay_Flag | kSkipTiled_Flag;
     }
 
     virtual void onDraw(SkCanvas* canvas) {
@@ -135,12 +133,12 @@ protected:
 
         SkImageFilter* filters[] = {
             NULL,
-            new SkDropShadowImageFilter(7.0f, 0.0f, 0.0f, 3.0f, SK_ColorBLUE),
-            new SkDropShadowImageFilter(0.0f, 7.0f, 3.0f, 0.0f, SK_ColorBLUE),
-            new SkDropShadowImageFilter(7.0f, 7.0f, 3.0f, 3.0f, SK_ColorBLUE),
-            new SkDropShadowImageFilter(7.0f, 7.0f, 3.0f, 3.0f, SK_ColorBLUE, cfif),
-            new SkDropShadowImageFilter(7.0f, 7.0f, 3.0f, 3.0f, SK_ColorBLUE, NULL, &cropRect),
-            new SkDropShadowImageFilter(7.0f, 7.0f, 3.0f, 3.0f, SK_ColorBLUE, NULL, &bogusRect),
+            SkDropShadowImageFilter::Create(7.0f, 0.0f, 0.0f, 3.0f, SK_ColorBLUE),
+            SkDropShadowImageFilter::Create(0.0f, 7.0f, 3.0f, 0.0f, SK_ColorBLUE),
+            SkDropShadowImageFilter::Create(7.0f, 7.0f, 3.0f, 3.0f, SK_ColorBLUE),
+            SkDropShadowImageFilter::Create(7.0f, 7.0f, 3.0f, 3.0f, SK_ColorBLUE, cfif),
+            SkDropShadowImageFilter::Create(7.0f, 7.0f, 3.0f, 3.0f, SK_ColorBLUE, NULL, &cropRect),
+            SkDropShadowImageFilter::Create(7.0f, 7.0f, 3.0f, 3.0f, SK_ColorBLUE, NULL, &bogusRect),
         };
 
         SkRect r = SkRect::MakeWH(SkIntToScalar(64), SkIntToScalar(64));

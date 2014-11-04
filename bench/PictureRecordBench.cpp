@@ -4,17 +4,18 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkCanvas.h"
 #include "SkColor.h"
 #include "SkPaint.h"
 #include "SkPicture.h"
+#include "SkPictureRecorder.h"
 #include "SkPoint.h"
 #include "SkRandom.h"
 #include "SkRect.h"
 #include "SkString.h"
 
-class PictureRecordBench : public SkBenchmark {
+class PictureRecordBench : public Benchmark {
 public:
     PictureRecordBench(const char name[])  {
         fName.printf("picture_record_%s", name);
@@ -34,7 +35,7 @@ protected:
     }
 private:
     SkString fName;
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 
@@ -51,15 +52,15 @@ public:
 
 protected:
     virtual void onDraw(const int loops, SkCanvas*) SK_OVERRIDE {
-        SkAutoTDelete<SkPicture> picture;
+        SkPictureRecorder recorder;
         SkCanvas* canvas = NULL;
 
         const SkPoint translateDelta = getTranslateDelta(loops);
 
         for (int i = 0; i < loops; i++) {
             if (0 == i % kMaxLoopsPerCanvas) {
-                picture.reset(SkNEW(SkPicture));
-                canvas = picture->beginRecording(PICTURE_WIDTH, PICTURE_HEIGHT);
+                SkAutoTUnref<SkPicture> picture(recorder.endRecording());
+                canvas = recorder.beginRecording(PICTURE_WIDTH, PICTURE_HEIGHT, NULL, 0);
             }
 
             SkColor color = SK_ColorYELLOW + (i % 255);
@@ -84,8 +85,8 @@ protected:
 
             // create a simple bitmap
             SkBitmap bitmap;
-            bitmap.setConfig(SkBitmap::kRGB_565_Config, 10, 10);
-            bitmap.allocPixels();
+            bitmap.allocPixels(SkImageInfo::Make(10, 10,
+                                                 kRGB_565_SkColorType, kOpaque_SkAlphaType));
 
             // draw a single color into the bitmap
             SkCanvas bitmapCanvas(bitmap);
@@ -120,12 +121,12 @@ protected:
     virtual void onDraw(const int loops, SkCanvas*) SK_OVERRIDE {
         SkRandom rand;
         SkPaint paint;
-        SkAutoTDelete<SkPicture> picture;
+        SkPictureRecorder recorder;
         SkCanvas* canvas = NULL;
         for (int i = 0; i < loops; i++) {
             if (0 == i % kMaxLoopsPerCanvas) {
-                picture.reset(SkNEW(SkPicture));
-                canvas = picture->beginRecording(PICTURE_WIDTH, PICTURE_HEIGHT);
+                SkAutoTUnref<SkPicture> picture(recorder.endRecording());
+                canvas = recorder.beginRecording(PICTURE_WIDTH, PICTURE_HEIGHT, NULL, 0);
             }
             paint.setColor(rand.nextU());
             canvas->drawPaint(paint);
@@ -158,8 +159,8 @@ public:
     };
 protected:
     virtual void onDraw(const int loops, SkCanvas*) SK_OVERRIDE {
-        SkPicture picture;
-        SkCanvas* canvas = picture.beginRecording(PICTURE_WIDTH, PICTURE_HEIGHT);
+        SkPictureRecorder recorder;
+        SkCanvas* canvas = recorder.beginRecording(PICTURE_WIDTH, PICTURE_HEIGHT, NULL, 0);
         for (int i = 0; i < loops; i++) {
             canvas->drawPaint(fPaint[i % ObjCount]);
         }

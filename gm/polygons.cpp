@@ -22,13 +22,17 @@ public:
     PolygonsGM() {}
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() SK_OVERRIDE {
         return SkString("polygons");
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        size_t width = kNumPolygons * kCellSize + 40;
-        size_t height = (kNumJoins * kNumStrokeWidths + kNumExtraStyles) * kCellSize + 40;
+        int width = kNumPolygons * kCellSize + 40;
+        int height = (kNumJoins * kNumStrokeWidths + kNumExtraStyles) * kCellSize + 40;
         return SkISize::Make(width, height);
     }
 

@@ -4,12 +4,12 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkDeferredCanvas.h"
 #include "SkDevice.h"
 #include "SkString.h"
 
-class DeferredCanvasBench : public SkBenchmark {
+class DeferredCanvasBench : public Benchmark {
 public:
     DeferredCanvasBench(const char name[])  {
         fName.printf("deferred_canvas_%s", name);
@@ -25,6 +25,7 @@ protected:
     }
 
     virtual void onDraw(const int loops, SkCanvas* canvas) {
+#if 0   // what specifically are we interested in timing here?
         SkBaseDevice *device = canvas->getDevice()->createCompatibleDevice(
             SkBitmap::kARGB_8888_Config, CANVAS_WIDTH, CANVAS_HEIGHT, false);
 
@@ -35,6 +36,7 @@ protected:
         drawInDeferredCanvas(loops, deferredCanvas);
         finalizeDeferredCanvas(deferredCanvas);
         deferredCanvas->flush();
+#endif
     }
 
     virtual void initDeferredCanvas(SkDeferredCanvas* canvas) = 0;
@@ -44,7 +46,7 @@ protected:
     SkString fName;
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 class SimpleNotificationClient : public SkDeferredCanvas::NotificationClient {
@@ -81,7 +83,7 @@ protected:
         rect.setXYWH(0, 0, 10, 10);
         SkPaint paint;
         for (int i = 0; i < loops; i++) {
-            canvas->save(SkCanvas::kMatrixClip_SaveFlag);
+            canvas->save();
             canvas->translate(SkIntToScalar(i * 27 % CANVAS_WIDTH), SkIntToScalar(i * 13 % CANVAS_HEIGHT));
             canvas->drawRect(rect, paint);
             canvas->restore();

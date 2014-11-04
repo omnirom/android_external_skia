@@ -10,7 +10,7 @@
 #include "SkData.h"
 #include "SkDecodingImageGenerator.h"
 #include "SkDiscardableMemoryPool.h"
-#include "SkImageGenerator.h"
+#include "SkImageGeneratorPriv.h"
 #include "SkForceLinking.h"
 
 #include "SkCommandLineFlags.h"
@@ -31,10 +31,11 @@ bool sk_tools::LazyDecodeBitmap(const void* src,
         return false;
     }
 
-    SkAutoTDelete<SkImageGenerator> gen(SkNEW_ARGS(SkDecodingImageGenerator,
-                                                   (data)));
+    SkAutoTDelete<SkImageGenerator> gen(
+        SkDecodingImageGenerator::Create(
+            data, SkDecodingImageGenerator::Options()));
     SkImageInfo info;
-    if (!gen->getInfo(&info)) {
+    if ((NULL == gen.get()) || !gen->getInfo(&info)) {
         return false;
     }
     SkDiscardableMemory::Factory* pool = NULL;

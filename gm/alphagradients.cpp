@@ -29,8 +29,7 @@ protected:
         SkPaint paint;
         uint32_t flags = doPreMul ? SkGradientShader::kInterpolateColorsInPremul_Flag : 0;
         SkShader* s = SkGradientShader::CreateLinear(pts, colors, NULL, 2,
-                                                     SkShader::kClamp_TileMode,
-                                                     NULL, flags);
+                                                     SkShader::kClamp_TileMode, flags, NULL);
         paint.setShader(s)->unref();
         canvas->drawRect(r, paint);
 
@@ -73,7 +72,7 @@ protected:
         }
     }
 
-    virtual uint32_t onGetFlags() const { return kSkipPipe_Flag; }
+    virtual uint32_t onGetFlags() const { return kSkipPipe_Flag | kSkipTiled_Flag; }
 
 private:
     typedef skiagm::GM INHERITED;

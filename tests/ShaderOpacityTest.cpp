@@ -5,15 +5,16 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
-#include "TestClassDef.h"
-#include "SkShader.h"
-#include "SkGradientShader.h"
 #include "SkColorShader.h"
+#include "SkGradientShader.h"
+#include "SkShader.h"
+#include "Test.h"
 
 static void test_bitmap(skiatest::Reporter* reporter) {
+    SkImageInfo info = SkImageInfo::MakeN32Premul(2, 2);
+
     SkBitmap bmp;
-    bmp.setConfig(SkBitmap::kARGB_8888_Config, 2, 2);
+    bmp.setInfo(info);
 
     // test 1: bitmap without pixel data
     SkShader* shader = SkShader::CreateBitmapShader(bmp,
@@ -23,7 +24,7 @@ static void test_bitmap(skiatest::Reporter* reporter) {
     shader->unref();
 
     // From this point on, we have pixels
-    bmp.allocPixels();
+    bmp.allocPixels(info);
 
     // test 2: not opaque by default
     shader = SkShader::CreateBitmapShader(bmp,
@@ -102,11 +103,6 @@ static void test_color(skiatest::Reporter* reporter)
     REPORTER_ASSERT(reporter, colorShader2.isOpaque());
     SkColorShader colorShader3(SkColorSetARGB(0x7F,0,0,0));
     REPORTER_ASSERT(reporter, !colorShader3.isOpaque());
-
-    // with inherrited color, shader must declare itself as opaque,
-    // since lack of opacity will depend solely on the paint
-    SkColorShader colorShader4;
-    REPORTER_ASSERT(reporter, colorShader4.isOpaque());
 }
 
 DEF_TEST(ShaderOpacity, reporter) {

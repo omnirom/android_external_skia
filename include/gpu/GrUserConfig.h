@@ -13,11 +13,11 @@
 #endif
 
 /**
- * This gives a threshold in bytes of when to lock a GrGeometryBuffer vs using
+ * This gives a threshold in bytes of when to map a GrGeometryBuffer vs using
  * updateData. (Note the depending on the underlying 3D API the update functions
- * may always be implemented using a lock)
+ * may always be implemented using a map)
  */
-//#define GR_GEOM_BUFFER_LOCK_THRESHOLD (1<<15)
+//#define GR_GEOM_BUFFER_MAP_THRESHOLD (1<<15)
 
 /**
  * This gives a threshold in megabytes for the maximum size of the texture cache
@@ -36,5 +36,8 @@
 
 // Android's gl2.h provides the new glShaderSource signature
 #define GR_GL_USE_NEW_SHADER_SOURCE_SIGNATURE 1
+
+// Android build
+#define GR_ANDROID_BUILD 1
 
 #endif

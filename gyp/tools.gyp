@@ -13,17 +13,23 @@
       'target_name': 'tools',
       'type': 'none',
       'dependencies': [
-        'bench_pictures',
-        'filter',
-        'lua_pictures',
         'bbh_shootout',
+        'bench_pictures',
+        'bench_record',
+        'bench_playback',
+        'dump_record',
+        'filter',
+        'gpuveto',
         'lua_app',
+        'lua_pictures',
         'pinspect',
         'render_pdfs',
         'render_pictures',
         'skdiff',
-        'skpdiff',
         'skhello',
+        'skpdiff',
+        'skpinfo',
+        'skpmaker',
         'skimage',
         'test_image_decoder',
       ],
@@ -35,6 +41,86 @@
             ],
           },
         ],
+      ],
+    },
+    {  # This would go in gm.gyp, but it's also used by skimage below.
+      'target_name': 'gm_expectations',
+      'type': 'static_library',
+      'include_dirs' : [ '../src/utils/' ],
+      'sources': [
+        '../gm/gm_expectations.cpp',
+        '../tools/sk_tool_utils.cpp',
+      ],
+      'dependencies': [
+        'jsoncpp.gyp:jsoncpp',
+        'skia_lib.gyp:skia_lib',
+      ],
+      'direct_dependent_settings': {
+        'include_dirs': [ '../gm/' ],
+      },
+    },
+    {
+      'target_name': 'crash_handler',
+        'type': 'static_library',
+        'sources': [ '../tools/CrashHandler.cpp' ],
+        'dependencies': [ 'skia_lib.gyp:skia_lib' ],
+        'direct_dependent_settings': {
+          'include_dirs': [ '../tools' ],
+        },
+        'all_dependent_settings': {
+          'msvs_settings': {
+            'VCLinkerTool': {
+              'AdditionalDependencies': [ 'Dbghelp.lib' ],
+            }
+          },
+        }
+    },
+    {
+      'target_name': 'resources',
+      'type': 'static_library',
+      'sources': [ '../tools/Resources.cpp' ],
+      'dependencies': [
+        'flags.gyp:flags',
+        'skia_lib.gyp:skia_lib',
+      ],
+      'direct_dependent_settings': {
+        'include_dirs': [ '../tools/', ],
+      },
+    },
+    {
+      'target_name' : 'timer',
+      'type': 'static_library',
+      'sources': [
+        '../tools/timer/Timer.cpp',
+        '../tools/timer/TimerData.cpp',
+      ],
+      'include_dirs': [
+        '../src/core',
+        '../src/gpu',
+      ],
+      'direct_dependent_settings': {
+        'include_dirs': ['../tools/timer'],
+      },
+      'dependencies': [
+        'skia_lib.gyp:skia_lib',
+        'jsoncpp.gyp:jsoncpp',
+      ],
+      'conditions': [
+        ['skia_gpu == 1', {
+          'sources': [ '../tools/timer/GpuTimer.cpp' ],
+        }],
+        [ 'skia_os in ["mac", "ios"]', {
+          'sources': [ '../tools/timer/SysTimer_mach.cpp' ],
+        }],
+        [ 'skia_os == "win"', {
+          'sources': [ '../tools/timer/SysTimer_windows.cpp' ],
+        }],
+        [ 'skia_os in ["linux", "freebsd", "openbsd", "solaris", "android", "chromeos"]', {
+          'sources': [ '../tools/timer/SysTimer_posix.cpp' ],
+        }],
+        [ 'skia_os in ["linux", "freebsd", "openbsd", "solaris", "chromeos"]', {
+          'link_settings': { 'libraries': [ '-lrt' ] },
+        }],
       ],
     },
     {
@@ -110,6 +196,20 @@
       ],
     },
     {
+      'target_name': 'skpmaker',
+      'type': 'executable',
+      'sources': [
+        '../tools/skpmaker.cpp',
+      ],
+      'include_dirs': [
+        '../src/core',
+      ],
+      'dependencies': [
+        'flags.gyp:flags',
+        'skia_lib.gyp:skia_lib',
+      ],
+    },
+    {
       'target_name': 'skimagediff',
       'type': 'executable',
       'sources': [
@@ -158,20 +258,56 @@
         '../src/utils/',
       ],
       'dependencies': [
+        'gm_expectations',
         'flags.gyp:flags',
-        'gm.gyp:gm_expectations',
         'jsoncpp.gyp:jsoncpp',
         'skia_lib.gyp:skia_lib',
-        'utils.gyp:utils',
       ],
     },
-
+    {
+      'target_name': 'skpinfo',
+      'type': 'executable',
+      'sources': [
+        '../tools/skpinfo.cpp',
+      ],
+      'include_dirs': [
+        '../tools/flags',
+        '../src/core/',
+      ],
+      'dependencies': [
+        'flags.gyp:flags',
+        'skia_lib.gyp:skia_lib',
+      ],
+    },
+    {
+      'target_name': 'gpuveto',
+      'type': 'executable',
+      'sources': [
+        '../tools/gpuveto.cpp',
+        '../tools/LazyDecodeBitmap.cpp',
+      ],
+      'include_dirs': [
+        '../src/core/',
+        '../src/images',
+        '../src/lazy',
+        '../tools/flags',
+      ],
+      'dependencies': [
+        'flags.gyp:flags',
+        'skia_lib.gyp:skia_lib',
+      ],
+    },
     {
       'target_name': 'lua_app',
       'type': 'executable',
       'sources': [
         '../tools/lua/lua_app.cpp',
         '../src/utils/SkLua.cpp',
+      ],
+      'include_dirs': [
+        # Lua exposes GrReduceClip which in turn requires src/core for SkTLList
+        '../src/gpu/',
+        '../src/core/',
       ],
       'dependencies': [
         'effects.gyp:effects',
@@ -180,7 +316,6 @@
         'pdf.gyp:pdf',
         'ports.gyp:ports',
         'skia_lib.gyp:skia_lib',
-        'utils.gyp:utils',
       ],
     },
     {
@@ -190,6 +325,11 @@
         '../tools/lua/lua_pictures.cpp',
         '../src/utils/SkLuaCanvas.cpp',
         '../src/utils/SkLua.cpp',
+      ],
+      'include_dirs': [
+        # Lua exposes GrReduceClip which in turn requires src/core for SkTLList
+        '../src/gpu/',
+        '../src/core/',
       ],
       'dependencies': [
         'effects.gyp:effects',
@@ -201,7 +341,6 @@
         'pdf.gyp:pdf',
         'ports.gyp:ports',
         'skia_lib.gyp:skia_lib',
-        'utils.gyp:utils',
       ],
     },
     {
@@ -227,12 +366,12 @@
       'target_name': 'bench_pictures',
       'type': 'executable',
       'sources': [
-        '../bench/SkBenchLogger.h',
-        '../bench/SkBenchLogger.cpp',
-        '../bench/TimerData.h',
-        '../bench/TimerData.cpp',
-        '../tools/bench_pictures_main.cpp',
+        '../bench/BenchLogger.cpp',
+        '../bench/BenchLogger.h',
+        '../bench/ResultsWriter.cpp',
         '../tools/PictureBenchmark.cpp',
+        '../tools/PictureResultsWriter.h',
+        '../tools/bench_pictures_main.cpp',
       ],
       'include_dirs': [
         '../src/core/',
@@ -240,17 +379,74 @@
         '../src/lazy/',
       ],
       'dependencies': [
-        'bench.gyp:bench_timer',
+        'timer',
+        'crash_handler',
+        'flags.gyp:flags',
+        'jsoncpp.gyp:jsoncpp',
+        'skia_lib.gyp:skia_lib',
+        'tools.gyp:picture_renderer',
+        'tools.gyp:picture_utils',
+      ],
+    },
+    {
+      'target_name': 'bench_record',
+      'type': 'executable',
+      'sources': [
+        '../tools/bench_record.cpp',
+        '../tools/LazyDecodeBitmap.cpp',
+      ],
+      'include_dirs': [
+        '../src/core/',
+        '../src/images',
+        '../src/lazy',
+      ],
+      'dependencies': [
+        'timer',
         'flags.gyp:flags',
         'skia_lib.gyp:skia_lib',
-        'tools.gyp:picture_utils',
-        'tools.gyp:picture_renderer',
+      ],
+    },
+    {
+      'target_name': 'bench_playback',
+      'type': 'executable',
+      'sources': [
+        '../tools/bench_playback.cpp',
+      ],
+      'include_dirs': [
+        '../src/core/',
+        '../src/images',
+      ],
+      'dependencies': [
+        'timer',
+        'flags.gyp:flags',
+        'skia_lib.gyp:skia_lib',
+      ],
+    },
+    {
+      'target_name': 'dump_record',
+      'type': 'executable',
+      'sources': [
+        '../tools/dump_record.cpp',
+        '../tools/DumpRecord.cpp',
+        '../tools/LazyDecodeBitmap.cpp',
+      ],
+      'include_dirs': [
+        '../src/core/',
+        '../src/images',
+        '../src/lazy',
+      ],
+      'dependencies': [
+        'timer',
+        'flags.gyp:flags',
+        'skia_lib.gyp:skia_lib',
       ],
     },
     {
       'target_name': 'picture_renderer',
       'type': 'static_library',
       'sources': [
+        '../tools/image_expectations.h',
+        '../tools/image_expectations.cpp',
         '../tools/LazyDecodeBitmap.cpp',
         '../tools/PictureRenderer.h',
         '../tools/PictureRenderer.cpp',
@@ -270,7 +466,7 @@
       ],
       'direct_dependent_settings': {
         'include_dirs': [
-          # needed for JSON headers used within PictureRenderer.h
+          # needed for JSON headers used within image_expectations.h
           '../third_party/externals/jsoncpp-chromium/overrides/include/',
           '../third_party/externals/jsoncpp/include/',
         ],
@@ -286,6 +482,9 @@
           {
             'include_dirs' : [
               '../src/gpu',
+            ],
+            'dependencies': [
+              'gputest.gyp:skgputest',
             ],
           },
         ],
@@ -356,7 +555,7 @@
       ],
       'direct_dependent_settings': {
         'include_dirs': [
-        '../tools/',
+          '../tools/',
         ],
       },
     },
@@ -383,11 +582,9 @@
         '../tools/bbh_shootout.cpp',
 
         # Bench code:
-        '../bench/TimerData.h',
-        '../bench/TimerData.cpp',
       ],
       'dependencies': [
-        'bench.gyp:bench_timer',
+        'timer',
         'flags.gyp:flags',
         'skia_lib.gyp:skia_lib',
         'tools.gyp:picture_renderer',
@@ -403,8 +600,6 @@
       ],
       'sources': [
         '../tools/filtermain.cpp',
-        '../tools/path_utils.h',
-        '../tools/path_utils.cpp',
         '../src/utils/debugger/SkDrawCommand.h',
         '../src/utils/debugger/SkDrawCommand.cpp',
         '../src/utils/debugger/SkDebugCanvas.h',
@@ -443,6 +638,9 @@
               '../src/utils/SkLua.cpp',
             ],
             'include_dirs': [
+              # Lua exposes GrReduceClip which in turn requires src/core for SkTLList
+              '../src/gpu/',
+              '../src/core/',
               '../third_party/lua/src/',
             ],
             'dependencies': [

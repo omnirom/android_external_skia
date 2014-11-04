@@ -4,7 +4,7 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkBitmapDevice.h"
 #include "SkBitmapSource.h"
 #include "SkCanvas.h"
@@ -15,7 +15,7 @@
 #define FILTER_WIDTH_LARGE  SkIntToScalar(256)
 #define FILTER_HEIGHT_LARGE SkIntToScalar(256)
 
-class MergeBench : public SkBenchmark {
+class MergeBench : public Benchmark {
 public:
     MergeBench(bool small) : fIsSmall(small), fInitialized(false) { }
 
@@ -44,18 +44,16 @@ protected:
 
 private:
     SkImageFilter* mergeBitmaps() {
-        SkImageFilter* first = new SkBitmapSource(fCheckerboard);
-        SkImageFilter* second = new SkBitmapSource(fBitmap);
+        SkImageFilter* first = SkBitmapSource::Create(fCheckerboard);
+        SkImageFilter* second = SkBitmapSource::Create(fBitmap);
         SkAutoUnref aur0(first);
         SkAutoUnref aur1(second);
-        return new SkMergeImageFilter(first, second);
+        return SkMergeImageFilter::Create(first, second);
     }
 
     void make_bitmap() {
-        fBitmap.setConfig(SkBitmap::kARGB_8888_Config, 80, 80);
-        fBitmap.allocPixels();
-        SkBitmapDevice device(fBitmap);
-        SkCanvas canvas(&device);
+        fBitmap.allocN32Pixels(80, 80);
+        SkCanvas canvas(fBitmap);
         canvas.clear(0x00000000);
         SkPaint paint;
         paint.setAntiAlias(true);
@@ -66,10 +64,8 @@ private:
     }
 
     void make_checkerboard() {
-        fCheckerboard.setConfig(SkBitmap::kARGB_8888_Config, 80, 80);
-        fCheckerboard.allocPixels();
-        SkBitmapDevice device(fCheckerboard);
-        SkCanvas canvas(&device);
+        fCheckerboard.allocN32Pixels(80, 80);
+        SkCanvas canvas(fCheckerboard);
         canvas.clear(0x00000000);
         SkPaint darkPaint;
         darkPaint.setColor(0xFF804020);
@@ -92,7 +88,7 @@ private:
     bool fInitialized;
     SkBitmap fBitmap, fCheckerboard;
 
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

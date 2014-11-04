@@ -14,8 +14,7 @@ namespace skiagm {
 
 static void make_bitmaps(int w, int h, SkBitmap* src, SkBitmap* dst,
                          SkBitmap* transparent) {
-    src->setConfig(SkBitmap::kARGB_8888_Config, w, h);
-    src->allocPixels();
+    src->allocN32Pixels(w, h);
     src->eraseColor(SK_ColorTRANSPARENT);
 
     SkPaint p;
@@ -32,8 +31,7 @@ static void make_bitmaps(int w, int h, SkBitmap* src, SkBitmap* dst,
         c.drawOval(r, p);
     }
 
-    dst->setConfig(SkBitmap::kARGB_8888_Config, w, h);
-    dst->allocPixels();
+    dst->allocN32Pixels(w, h);
     dst->eraseColor(SK_ColorTRANSPARENT);
 
     {
@@ -43,8 +41,7 @@ static void make_bitmaps(int w, int h, SkBitmap* src, SkBitmap* dst,
         c.drawRect(r, p);
     }
 
-    transparent->setConfig(SkBitmap::kARGB_8888_Config, w, h);
-    transparent->allocPixels();
+    transparent->allocN32Pixels(w, h);
     transparent->eraseColor(SK_ColorTRANSPARENT);
 }
 
@@ -115,7 +112,7 @@ class XfermodesGM : public GM {
                 break;
             }
             case kRectangleWithMask_SrcType: {
-                canvas->save(SkCanvas::kClip_SaveFlag);
+                canvas->save();
                 restoreNeeded = true;
                 SkScalar w = SkIntToScalar(W);
                 SkScalar h = SkIntToScalar(H);
@@ -151,8 +148,9 @@ class XfermodesGM : public GM {
     }
 
     virtual void onOnceBeforeDraw() SK_OVERRIDE {
-        fBG.setConfig(SkBitmap::kARGB_4444_Config, 2, 2, 4, kOpaque_SkAlphaType);
-        fBG.setPixels(gData);
+        fBG.installPixels(SkImageInfo::Make(2, 2, kARGB_4444_SkColorType,
+                                            kOpaque_SkAlphaType),
+                          gData, 4);
 
         make_bitmaps(W, H, &fSrcB, &fDstB, &fTransparent);
     }
@@ -168,7 +166,7 @@ protected:
     }
 
     virtual SkISize onISize() {
-        return make_isize(1990, 640);
+        return SkISize::Make(1990, 640);
     }
 
     virtual void onDraw(SkCanvas* canvas) {
@@ -218,12 +216,12 @@ protected:
 
         const SkScalar w = SkIntToScalar(W);
         const SkScalar h = SkIntToScalar(H);
-        SkShader* s = SkShader::CreateBitmapShader(fBG,
-                                                   SkShader::kRepeat_TileMode,
-                                                   SkShader::kRepeat_TileMode);
         SkMatrix m;
         m.setScale(SkIntToScalar(6), SkIntToScalar(6));
-        s->setLocalMatrix(m);
+        SkShader* s = SkShader::CreateBitmapShader(fBG,
+                                                   SkShader::kRepeat_TileMode,
+                                                   SkShader::kRepeat_TileMode,
+                                                   &m);
 
         SkPaint labelP;
         labelP.setAntiAlias(true);
@@ -249,7 +247,7 @@ protected:
                 p.setShader(s);
                 canvas->drawRect(r, p);
 
-                canvas->saveLayer(&r, NULL, SkCanvas::kARGB_ClipLayer_SaveFlag);
+                canvas->saveLayer(&r, NULL);
                 draw_mode(canvas, mode, static_cast<SrcType>(sourceType),
                           r.fLeft, r.fTop);
                 canvas->restore();

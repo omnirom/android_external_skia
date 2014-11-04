@@ -59,6 +59,8 @@ static struct oneLineQuad {
     SkDQuad quad;
     SkDLine line;
 } oneOffs[] = {
+    {{{{97.9337616,100}, {88,112.94265}, {88,130}}},
+     {{{88.919838,120}, {107.058823,120}}}},
     {{{{447.96701049804687, 894.4381103515625}, {448.007080078125, 894.4239501953125},
        {448.0140380859375, 894.4215087890625}}},
      {{{490.43548583984375, 879.40740966796875}, {405.59262084960937, 909.435546875}}}},
@@ -97,11 +99,11 @@ static void testOneOffs(skiatest::Reporter* reporter) {
     }
 }
 
-static void PathOpsQuadLineIntersectionOneOffTest(skiatest::Reporter* reporter) {
+DEF_TEST(PathOpsQuadLineIntersectionOneOff, reporter) {
     testOneOffs(reporter);
 }
 
-static void PathOpsQuadLineIntersectionTest(skiatest::Reporter* reporter) {
+DEF_TEST(PathOpsQuadLineIntersection, reporter) {
     for (size_t index = 0; index < lineQuadTests_count; ++index) {
         int iIndex = static_cast<int>(index);
         const SkDQuad& quad = lineQuadTests[index].quad;
@@ -147,8 +149,3 @@ static void PathOpsQuadLineIntersectionTest(skiatest::Reporter* reporter) {
         }
     }
 }
-
-#include "TestClassDef.h"
-DEFINE_TESTCLASS_SHORT(PathOpsQuadLineIntersectionTest)
-
-DEFINE_TESTCLASS_SHORT(PathOpsQuadLineIntersectionOneOffTest)

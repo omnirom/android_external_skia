@@ -5,8 +5,6 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
-#include "TestClassDef.h"
 #include "SkBitmap.h"
 #include "SkCanvas.h"
 #include "SkColor.h"
@@ -14,12 +12,12 @@
 #include "SkPoint.h"
 #include "SkRect.h"
 #include "SkTypes.h"
+#include "Test.h"
 
 static const SkColor bgColor = SK_ColorWHITE;
 
-static void create(SkBitmap* bm, SkIRect bound, SkBitmap::Config config) {
-    bm->setConfig(config, bound.width(), bound.height());
-    bm->allocPixels();
+static void create(SkBitmap* bm, SkIRect bound) {
+    bm->allocN32Pixels(bound.width(), bound.height());
 }
 
 static void drawBG(SkCanvas* canvas) {
@@ -68,12 +66,12 @@ DEF_TEST(DrawText, reporter) {
 
     SkIRect drawTextRect = SkIRect::MakeWH(64, 64);
     SkBitmap drawTextBitmap;
-    create(&drawTextBitmap, drawTextRect, SkBitmap::kARGB_8888_Config);
+    create(&drawTextBitmap, drawTextRect);
     SkCanvas drawTextCanvas(drawTextBitmap);
 
     SkIRect drawPosTextRect = SkIRect::MakeWH(64, 64);
     SkBitmap drawPosTextBitmap;
-    create(&drawPosTextBitmap, drawPosTextRect, SkBitmap::kARGB_8888_Config);
+    create(&drawPosTextBitmap, drawPosTextRect);
     SkCanvas drawPosTextCanvas(drawPosTextBitmap);
 
     for (float offsetY = 0.0f; offsetY < 1.0f; offsetY += (1.0f / 16.0f)) {

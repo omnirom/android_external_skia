@@ -18,35 +18,29 @@ public:
     }
 
 protected:
-#ifdef SK_SCALAR_IS_FIXED
     virtual uint32_t onGetFlags() const SK_OVERRIDE {
-        // SkCanvas::drawCircle, used by this test, performs a quick reject.
-        // The large size given to the device used by SkGPipeCanvas means that
-        // the device clip will not be set properly and circles will be
-        // rejected when in FIXED.
-        return this->INHERITED::onGetFlags() | GM::kSkipPipe_Flag;
+        return kSkipTiled_Flag;
     }
-#endif
 
     virtual SkString onShortName() {
         return SkString("blurs");
     }
 
     virtual SkISize onISize() {
-        return make_isize(700, 500);
+        return SkISize::Make(700, 500);
     }
 
     virtual void onDraw(SkCanvas* canvas) {
-        SkBlurMaskFilter::BlurStyle NONE = SkBlurMaskFilter::BlurStyle(-999);
+        SkBlurStyle NONE = SkBlurStyle(-999);
         static const struct {
-            SkBlurMaskFilter::BlurStyle fStyle;
-            int                         fCx, fCy;
+            SkBlurStyle fStyle;
+            int         fCx, fCy;
         } gRecs[] = {
-            { NONE,                                 0,  0 },
-            { SkBlurMaskFilter::kInner_BlurStyle,  -1,  0 },
-            { SkBlurMaskFilter::kNormal_BlurStyle,  0,  1 },
-            { SkBlurMaskFilter::kSolid_BlurStyle,   0, -1 },
-            { SkBlurMaskFilter::kOuter_BlurStyle,   1,  0 },
+            { NONE,                 0,  0 },
+            { kInner_SkBlurStyle,  -1,  0 },
+            { kNormal_SkBlurStyle,  0,  1 },
+            { kSolid_SkBlurStyle,   0, -1 },
+            { kOuter_SkBlurStyle,   1,  0 },
         };
 
         SkPaint paint;
@@ -74,7 +68,7 @@ protected:
             }
             // draw text
             {
-                SkMaskFilter* mf = SkBlurMaskFilter::Create(SkBlurMaskFilter::kNormal_BlurStyle,
+                SkMaskFilter* mf = SkBlurMaskFilter::Create(kNormal_SkBlurStyle,
                                            SkBlurMask::ConvertRadiusToSigma(SkIntToScalar(4)),
                                            flags);
                 paint.setMaskFilter(mf)->unref();

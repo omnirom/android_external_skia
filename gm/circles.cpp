@@ -25,12 +25,16 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() SK_OVERRIDE {
         return SkString("circles");
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        return make_isize(1200, 900);
+        return SkISize::Make(1200, 900);
     }
 
     void makePaints() {
@@ -52,7 +56,7 @@ protected:
         SkPaint p;
         p.setAntiAlias(true);
         SkMaskFilter* mf = SkBlurMaskFilter::Create(
-                               SkBlurMaskFilter::kNormal_BlurStyle,
+                               kNormal_SkBlurStyle,
                                SkBlurMask::ConvertRadiusToSigma(SkIntToScalar(5)),
                                SkBlurMaskFilter::kHighQuality_BlurFlag);
         p.setMaskFilter(mf)->unref();
@@ -81,12 +85,12 @@ protected:
         SkPaint p;
         p.setAntiAlias(true);
         SkBlurDrawLooper* shadowLooper =
-            new SkBlurDrawLooper (SK_ColorBLUE,
-                                  SkBlurMask::ConvertRadiusToSigma(SkIntToScalar(10)),
-                                  SkIntToScalar(5), SkIntToScalar(10),
-                                  SkBlurDrawLooper::kIgnoreTransform_BlurFlag |
-                                  SkBlurDrawLooper::kOverrideColor_BlurFlag |
-                                  SkBlurDrawLooper::kHighQuality_BlurFlag);
+            SkBlurDrawLooper::Create(SK_ColorBLUE,
+                                     SkBlurMask::ConvertRadiusToSigma(SkIntToScalar(10)),
+                                     SkIntToScalar(5), SkIntToScalar(10),
+                                     SkBlurDrawLooper::kIgnoreTransform_BlurFlag |
+                                     SkBlurDrawLooper::kOverrideColor_BlurFlag |
+                                     SkBlurDrawLooper::kHighQuality_BlurFlag);
         SkAutoUnref aurL0(shadowLooper);
         p.setLooper(shadowLooper);
         fPaints.push_back(p);

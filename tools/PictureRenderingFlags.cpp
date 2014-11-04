@@ -18,21 +18,34 @@
 
 // Alphabetized list of flags used by this file or bench_ and render_pictures.
 DEFINE_string(bbh, "none", "bbhType [width height]: Set the bounding box hierarchy type to "
-              "be used. Accepted values are: none, rtree, grid. "
+              "be used. Accepted values are: none, rtree, quadtree, grid. "
               "Not compatible with --pipe. With value "
               "'grid', width and height must be specified. 'grid' can "
               "only be used with modes tile, record, and "
               "playbackCreation.");
+
+
+#if SK_SUPPORT_GPU
+#define GPU_CONFIG_STRING "|gpu|msaa4|msaa16|nvprmsaa4|nvprmsaa16"
+#else
+#define GPU_CONFIG_STRING ""
+#endif
+#if SK_ANGLE
+#define ANGLE_CONFIG_STRING "|angle"
+#else
+#define ANGLE_CONFIG_STRING ""
+#endif
+#if SK_MESA
+#define MESA_CONFIG_STRING "|mesa"
+#else
+#define MESA_CONFIG_STRING ""
+#endif
+
 // Although this config does not support all the same options as gm, the names should be kept
 // consistent.
-#if SK_ANGLE
-// ANGLE assumes GPU
-DEFINE_string(config, "8888", "[8888|gpu|msaa4|msaa16|angle]: Use the corresponding config.");
-#elif SK_SUPPORT_GPU
-DEFINE_string(config, "8888", "[8888|gpu|msaa4|msaa16]: Use the corresponding config.");
-#else
-DEFINE_string(config, "8888", "[8888]: Use the corresponding config.");
-#endif
+DEFINE_string(config, "8888", "["
+              "8888" GPU_CONFIG_STRING ANGLE_CONFIG_STRING MESA_CONFIG_STRING
+              "]: Use the corresponding config.");
 
 DEFINE_bool(deferImageDecoding, false, "Defer decoding until drawing images. "
             "Has no effect if the provided skp does not have its images encoded.");
@@ -122,7 +135,9 @@ sk_tools::PictureRenderer* parseRenderer(SkString& error, PictureTool tool) {
         // Allow 'mode' to be set to 'simple', but do not create a renderer, so we can
         // ensure that pipe does not override a mode besides simple. The renderer will
         // be created below.
-        } else if (0 != strcmp(mode, "simple")) {
+        } else if (0 == strcmp(mode, "simple")) {
+            gridSupported = true;
+        } else {
             error.printf("%s is not a valid mode for --mode\n", mode);
             return NULL;
         }
@@ -276,11 +291,36 @@ sk_tools::PictureRenderer* parseRenderer(SkString& error, PictureTool tool) {
             }
             sampleCount = 16;
         }
+        else if (0 == strcmp(FLAGS_config[0], "nvprmsaa4")) {
+            deviceType = sk_tools::PictureRenderer::kNVPR_DeviceType;
+            if (FLAGS_multi > 1) {
+                error.printf("GPU not compatible with multithreaded tiling.\n");
+                return NULL;
+            }
+            sampleCount = 4;
+        }
+        else if (0 == strcmp(FLAGS_config[0], "nvprmsaa16")) {
+            deviceType = sk_tools::PictureRenderer::kNVPR_DeviceType;
+            if (FLAGS_multi > 1) {
+                error.printf("GPU not compatible with multithreaded tiling.\n");
+                return NULL;
+            }
+            sampleCount = 16;
+        }
 #if SK_ANGLE
         else if (0 == strcmp(FLAGS_config[0], "angle")) {
             deviceType = sk_tools::PictureRenderer::kAngle_DeviceType;
             if (FLAGS_multi > 1) {
                 error.printf("Angle not compatible with multithreaded tiling.\n");
+                return NULL;
+            }
+        }
+#endif
+#if SK_MESA
+        else if (0 == strcmp(FLAGS_config[0], "mesa")) {
+            deviceType = sk_tools::PictureRenderer::kMesa_DeviceType;
+            if (FLAGS_multi > 1) {
+                error.printf("Mesa not compatible with multithreaded tiling.\n");
                 return NULL;
             }
         }
@@ -303,6 +343,8 @@ sk_tools::PictureRenderer* parseRenderer(SkString& error, PictureTool tool) {
         const char* type = FLAGS_bbh[0];
         if (0 == strcmp(type, "none")) {
             bbhType = sk_tools::PictureRenderer::kNone_BBoxHierarchyType;
+        } else if (0 == strcmp(type, "quadtree")) {
+            bbhType = sk_tools::PictureRenderer::kQuadTree_BBoxHierarchyType;
         } else if (0 == strcmp(type, "rtree")) {
             bbhType = sk_tools::PictureRenderer::kRTree_BBoxHierarchyType;
         } else if (0 == strcmp(type, "grid")) {

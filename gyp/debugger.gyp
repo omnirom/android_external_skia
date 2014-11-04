@@ -96,8 +96,8 @@
       ],
       'dependencies': [
         'skia_lib.gyp:skia_lib',
-        'bench.gyp:bench_timer',
         'tools.gyp:picture_renderer',
+        'tools.gyp:timer',
       ],
       'conditions': [
         [ 'skia_os == "nacl"', {
@@ -142,6 +142,10 @@
             '<(moc_gen_dir)/moc_SkRasterWidget.cpp',
             '<(moc_gen_dir)/moc_SkImageWidget.cpp',
             '<(moc_gen_dir)/moc_SkGLWidget.cpp',
+          ],
+          'cflags': [
+            # Clang gets confused by QWeakPointer, see http://llvm.org/bugs/show_bug.cgi?id=13127
+            '-Wno-uninitialized',
           ],
           'dependencies': [
             'debugger_qt_mocs',

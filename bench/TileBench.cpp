@@ -6,7 +6,7 @@
  * found in the LICENSE file.
  */
 
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkBitmap.h"
 #include "SkCanvas.h"
 #include "SkShader.h"
@@ -28,7 +28,7 @@ static void create_gradient(SkBitmap* bm) {
 
 // Test out the special case of a tiled 1xN texture. Test out opacity,
 // filtering and the different tiling modes
-class ConstXTileBench : public SkBenchmark {
+class ConstXTileBench : public Benchmark {
     SkPaint             fPaint;
     SkString            fName;
     bool                fDoFilter;
@@ -48,9 +48,7 @@ public:
         , fDoScale(doScale) {
         SkBitmap bm;
 
-        bm.setConfig(SkBitmap::kARGB_8888_Config, kWidth, kHeight, 0,
-                     kOpaque_SkAlphaType);
-        bm.allocPixels();
+        bm.allocN32Pixels(kWidth, kHeight, true);
         bm.eraseColor(SK_ColorWHITE);
 
         create_gradient(&bm);
@@ -113,7 +111,7 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 DEF_BENCH(return new ConstXTileBench(SkShader::kRepeat_TileMode, SkShader::kRepeat_TileMode, false, false, true))

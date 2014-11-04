@@ -5,17 +5,19 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
-#include "TestClassDef.h"
 #include "SkBitmapDevice.h"
 #include "SkBitmapSource.h"
 #include "SkCanvas.h"
 #include "SkMallocPixelRef.h"
-#include "SkOrderedWriteBuffer.h"
+#include "SkPictureRecorder.h"
+#include "SkTemplates.h"
+#include "SkWriteBuffer.h"
 #include "SkValidatingReadBuffer.h"
 #include "SkXfermodeImageFilter.h"
+#include "Test.h"
 
 static const uint32_t kArraySize = 64;
+static const int kBitmapSize = 256;
 
 template<typename T>
 static void TestAlignment(T* testObj, skiatest::Reporter* reporter) {
@@ -29,7 +31,7 @@ static void TestAlignment(T* testObj, skiatest::Reporter* reporter) {
 
 template<typename T> struct SerializationUtils {
     // Generic case for flattenables
-    static void Write(SkOrderedWriteBuffer& writer, const T* flattenable) {
+    static void Write(SkWriteBuffer& writer, const T* flattenable) {
         writer.writeFlattenable(flattenable);
     }
     static void Read(SkValidatingReadBuffer& reader, T** flattenable) {
@@ -38,7 +40,7 @@ template<typename T> struct SerializationUtils {
 };
 
 template<> struct SerializationUtils<SkMatrix> {
-    static void Write(SkOrderedWriteBuffer& writer, const SkMatrix* matrix) {
+    static void Write(SkWriteBuffer& writer, const SkMatrix* matrix) {
         writer.writeMatrix(*matrix);
     }
     static void Read(SkValidatingReadBuffer& reader, SkMatrix* matrix) {
@@ -47,7 +49,7 @@ template<> struct SerializationUtils<SkMatrix> {
 };
 
 template<> struct SerializationUtils<SkPath> {
-    static void Write(SkOrderedWriteBuffer& writer, const SkPath* path) {
+    static void Write(SkWriteBuffer& writer, const SkPath* path) {
         writer.writePath(*path);
     }
     static void Read(SkValidatingReadBuffer& reader, SkPath* path) {
@@ -56,7 +58,7 @@ template<> struct SerializationUtils<SkPath> {
 };
 
 template<> struct SerializationUtils<SkRegion> {
-    static void Write(SkOrderedWriteBuffer& writer, const SkRegion* region) {
+    static void Write(SkWriteBuffer& writer, const SkRegion* region) {
         writer.writeRegion(*region);
     }
     static void Read(SkValidatingReadBuffer& reader, SkRegion* region) {
@@ -64,8 +66,17 @@ template<> struct SerializationUtils<SkRegion> {
     }
 };
 
+template<> struct SerializationUtils<SkString> {
+    static void Write(SkWriteBuffer& writer, const SkString* string) {
+        writer.writeString(string->c_str());
+    }
+    static void Read(SkValidatingReadBuffer& reader, SkString* string) {
+        reader.readString(string);
+    }
+};
+
 template<> struct SerializationUtils<unsigned char> {
-    static void Write(SkOrderedWriteBuffer& writer, unsigned char* data, uint32_t arraySize) {
+    static void Write(SkWriteBuffer& writer, unsigned char* data, uint32_t arraySize) {
         writer.writeByteArray(data, arraySize);
     }
     static bool Read(SkValidatingReadBuffer& reader, unsigned char* data, uint32_t arraySize) {
@@ -74,7 +85,7 @@ template<> struct SerializationUtils<unsigned char> {
 };
 
 template<> struct SerializationUtils<SkColor> {
-    static void Write(SkOrderedWriteBuffer& writer, SkColor* data, uint32_t arraySize) {
+    static void Write(SkWriteBuffer& writer, SkColor* data, uint32_t arraySize) {
         writer.writeColorArray(data, arraySize);
     }
     static bool Read(SkValidatingReadBuffer& reader, SkColor* data, uint32_t arraySize) {
@@ -83,7 +94,7 @@ template<> struct SerializationUtils<SkColor> {
 };
 
 template<> struct SerializationUtils<int32_t> {
-    static void Write(SkOrderedWriteBuffer& writer, int32_t* data, uint32_t arraySize) {
+    static void Write(SkWriteBuffer& writer, int32_t* data, uint32_t arraySize) {
         writer.writeIntArray(data, arraySize);
     }
     static bool Read(SkValidatingReadBuffer& reader, int32_t* data, uint32_t arraySize) {
@@ -92,7 +103,7 @@ template<> struct SerializationUtils<int32_t> {
 };
 
 template<> struct SerializationUtils<SkPoint> {
-    static void Write(SkOrderedWriteBuffer& writer, SkPoint* data, uint32_t arraySize) {
+    static void Write(SkWriteBuffer& writer, SkPoint* data, uint32_t arraySize) {
         writer.writePointArray(data, arraySize);
     }
     static bool Read(SkValidatingReadBuffer& reader, SkPoint* data, uint32_t arraySize) {
@@ -101,7 +112,7 @@ template<> struct SerializationUtils<SkPoint> {
 };
 
 template<> struct SerializationUtils<SkScalar> {
-    static void Write(SkOrderedWriteBuffer& writer, SkScalar* data, uint32_t arraySize) {
+    static void Write(SkWriteBuffer& writer, SkScalar* data, uint32_t arraySize) {
         writer.writeScalarArray(data, arraySize);
     }
     static bool Read(SkValidatingReadBuffer& reader, SkScalar* data, uint32_t arraySize) {
@@ -109,16 +120,27 @@ template<> struct SerializationUtils<SkScalar> {
     }
 };
 
-template<typename T>
-static void TestObjectSerialization(T* testObj, skiatest::Reporter* reporter) {
-    SkOrderedWriteBuffer writer(1024);
-    writer.setFlags(SkOrderedWriteBuffer::kValidation_Flag);
+template<typename T, bool testInvalid> struct SerializationTestUtils {
+    static void InvalidateData(unsigned char* data) {}
+};
+
+template<> struct SerializationTestUtils<SkString, true> {
+    static void InvalidateData(unsigned char* data) {
+        data[3] |= 0x80; // Reverse sign of 1st integer
+    }
+};
+
+template<typename T, bool testInvalid>
+static void TestObjectSerializationNoAlign(T* testObj, skiatest::Reporter* reporter) {
+    SkWriteBuffer writer(SkWriteBuffer::kValidation_Flag);
     SerializationUtils<T>::Write(writer, testObj);
     size_t bytesWritten = writer.bytesWritten();
     REPORTER_ASSERT(reporter, SkAlign4(bytesWritten) == bytesWritten);
 
     unsigned char dataWritten[1024];
     writer.writeToMemory(dataWritten);
+
+    SerializationTestUtils<T, testInvalid>::InvalidateData(dataWritten);
 
     // Make sure this fails when it should (test with smaller size, but still multiple of 4)
     SkValidatingReadBuffer buffer(dataWritten, bytesWritten - 4);
@@ -133,17 +155,22 @@ static void TestObjectSerialization(T* testObj, skiatest::Reporter* reporter) {
     SerializationUtils<T>::Read(buffer2, &obj2);
     const unsigned char* peekAfter = static_cast<const unsigned char*>(buffer2.skip(0));
     // This should have succeeded, since there are enough bytes to read this
-    REPORTER_ASSERT(reporter, buffer2.isValid());
+    REPORTER_ASSERT(reporter, buffer2.isValid() == !testInvalid);
+    // Note: This following test should always succeed, regardless of whether the buffer is valid,
+    // since if it is invalid, it will simply skip to the end, as if it had read the whole buffer.
     REPORTER_ASSERT(reporter, static_cast<size_t>(peekAfter - peekBefore) == bytesWritten);
+}
 
+template<typename T>
+static void TestObjectSerialization(T* testObj, skiatest::Reporter* reporter) {
+    TestObjectSerializationNoAlign<T, false>(testObj, reporter);
     TestAlignment(testObj, reporter);
 }
 
 template<typename T>
 static T* TestFlattenableSerialization(T* testObj, bool shouldSucceed,
                                        skiatest::Reporter* reporter) {
-    SkOrderedWriteBuffer writer(1024);
-    writer.setFlags(SkOrderedWriteBuffer::kValidation_Flag);
+    SkWriteBuffer writer(SkWriteBuffer::kValidation_Flag);
     SerializationUtils<T>::Write(writer, testObj);
     size_t bytesWritten = writer.bytesWritten();
     REPORTER_ASSERT(reporter, SkAlign4(bytesWritten) == bytesWritten);
@@ -181,8 +208,7 @@ static T* TestFlattenableSerialization(T* testObj, bool shouldSucceed,
 
 template<typename T>
 static void TestArraySerialization(T* data, skiatest::Reporter* reporter) {
-    SkOrderedWriteBuffer writer(1024);
-    writer.setFlags(SkOrderedWriteBuffer::kValidation_Flag);
+    SkWriteBuffer writer(SkWriteBuffer::kValidation_Flag);
     SerializationUtils<T>::Write(writer, data, kArraySize);
     size_t bytesWritten = writer.bytesWritten();
     // This should write the length (in 4 bytes) and the array
@@ -209,29 +235,86 @@ static void TestBitmapSerialization(const SkBitmap& validBitmap,
                                     const SkBitmap& invalidBitmap,
                                     bool shouldSucceed,
                                     skiatest::Reporter* reporter) {
-    SkBitmapSource validBitmapSource(validBitmap);
-    SkBitmapSource invalidBitmapSource(invalidBitmap);
+    SkAutoTUnref<SkBitmapSource> validBitmapSource(SkBitmapSource::Create(validBitmap));
+    SkAutoTUnref<SkBitmapSource> invalidBitmapSource(SkBitmapSource::Create(invalidBitmap));
     SkAutoTUnref<SkXfermode> mode(SkXfermode::Create(SkXfermode::kSrcOver_Mode));
-    SkXfermodeImageFilter xfermodeImageFilter(mode, &invalidBitmapSource, &validBitmapSource);
+    SkAutoTUnref<SkXfermodeImageFilter> xfermodeImageFilter(
+        SkXfermodeImageFilter::Create(mode, invalidBitmapSource, validBitmapSource));
 
     SkAutoTUnref<SkImageFilter> deserializedFilter(
         TestFlattenableSerialization<SkImageFilter>(
-            &xfermodeImageFilter, shouldSucceed, reporter));
+            xfermodeImageFilter, shouldSucceed, reporter));
 
     // Try to render a small bitmap using the invalid deserialized filter
     // to make sure we don't crash while trying to render it
     if (shouldSucceed) {
         SkBitmap bitmap;
-        bitmap.setConfig(SkBitmap::kARGB_8888_Config, 24, 24);
-        bitmap.allocPixels();
-        SkBitmapDevice device(bitmap);
-        SkCanvas canvas(&device);
+        bitmap.allocN32Pixels(24, 24);
+        SkCanvas canvas(bitmap);
         canvas.clear(0x00000000);
         SkPaint paint;
         paint.setImageFilter(deserializedFilter);
         canvas.clipRect(SkRect::MakeXYWH(0, 0, SkIntToScalar(24), SkIntToScalar(24)));
         canvas.drawBitmap(bitmap, 0, 0, &paint);
     }
+}
+
+static bool setup_bitmap_for_canvas(SkBitmap* bitmap) {
+    SkImageInfo info = SkImageInfo::Make(
+        kBitmapSize, kBitmapSize, kN32_SkColorType, kPremul_SkAlphaType);
+    return bitmap->allocPixels(info);
+}
+
+static bool make_checkerboard_bitmap(SkBitmap& bitmap) {
+    bool success = setup_bitmap_for_canvas(&bitmap);
+
+    SkCanvas canvas(bitmap);
+    canvas.clear(0x00000000);
+    SkPaint darkPaint;
+    darkPaint.setColor(0xFF804020);
+    SkPaint lightPaint;
+    lightPaint.setColor(0xFF244484);
+    const int i = kBitmapSize / 8;
+    const SkScalar f = SkIntToScalar(i);
+    for (int y = 0; y < kBitmapSize; y += i) {
+        for (int x = 0; x < kBitmapSize; x += i) {
+            canvas.save();
+            canvas.translate(SkIntToScalar(x), SkIntToScalar(y));
+            canvas.drawRect(SkRect::MakeXYWH(0, 0, f, f), darkPaint);
+            canvas.drawRect(SkRect::MakeXYWH(f, 0, f, f), lightPaint);
+            canvas.drawRect(SkRect::MakeXYWH(0, f, f, f), lightPaint);
+            canvas.drawRect(SkRect::MakeXYWH(f, f, f, f), darkPaint);
+            canvas.restore();
+        }
+    }
+
+    return success;
+}
+
+static bool drawSomething(SkCanvas* canvas) {
+    SkPaint paint;
+    SkBitmap bitmap;
+    bool success = make_checkerboard_bitmap(bitmap);
+
+    canvas->save();
+    canvas->scale(0.5f, 0.5f);
+    canvas->drawBitmap(bitmap, 0, 0, NULL);
+    canvas->restore();
+
+    const char beforeStr[] = "before circle";
+    const char afterStr[] = "after circle";
+
+    paint.setAntiAlias(true);
+
+    paint.setColor(SK_ColorRED);
+    canvas->drawData(beforeStr, sizeof(beforeStr));
+    canvas->drawCircle(SkIntToScalar(kBitmapSize/2), SkIntToScalar(kBitmapSize/2), SkIntToScalar(kBitmapSize/3), paint);
+    canvas->drawData(afterStr, sizeof(afterStr));
+    paint.setColor(SK_ColorBLACK);
+    paint.setTextSize(SkIntToScalar(kBitmapSize/3));
+    canvas->drawText("Picture", 7, SkIntToScalar(kBitmapSize/2), SkIntToScalar(kBitmapSize/4), paint);
+
+    return success;
 }
 
 DEF_TEST(Serialization, reporter) {
@@ -251,6 +334,13 @@ DEF_TEST(Serialization, reporter) {
     {
         SkRegion region;
         TestObjectSerialization(&region, reporter);
+    }
+
+    // Test string serialization
+    {
+        SkString string("string");
+        TestObjectSerializationNoAlign<SkString, false>(&string, reporter);
+        TestObjectSerializationNoAlign<SkString, true>(&string, reporter);
     }
 
     // Test rrect serialization
@@ -297,36 +387,39 @@ DEF_TEST(Serialization, reporter) {
 
     // Test invalid deserializations
     {
+        SkImageInfo info = SkImageInfo::MakeN32Premul(kBitmapSize, kBitmapSize);
+
         SkBitmap validBitmap;
-        validBitmap.setConfig(SkBitmap::kARGB_8888_Config, 256, 256);
+        validBitmap.setInfo(info);
 
         // Create a bitmap with a really large height
+        info.fHeight = 1000000000;
         SkBitmap invalidBitmap;
-        invalidBitmap.setConfig(SkBitmap::kARGB_8888_Config, 256, 1000000000);
+        invalidBitmap.setInfo(info);
 
         // The deserialization should succeed, and the rendering shouldn't crash,
         // even when the device fails to initialize, due to its size
         TestBitmapSerialization(validBitmap, invalidBitmap, true, reporter);
+    }
 
-        // Create a bitmap with a pixel ref too small
-        SkImageInfo info;
-        info.fWidth = 256;
-        info.fHeight = 256;
-        info.fColorType = kPMColor_SkColorType;
-        info.fAlphaType = kPremul_SkAlphaType;
+    // Test simple SkPicture serialization
+    {
+        SkPictureRecorder recorder;
+        bool didDraw = drawSomething(recorder.beginRecording(kBitmapSize, kBitmapSize, NULL, 0));
+        REPORTER_ASSERT(reporter, didDraw);
+        SkAutoTUnref<SkPicture> pict(recorder.endRecording());
 
-        SkBitmap invalidBitmap2;
-        invalidBitmap2.setConfig(info);
-        
-        // Hack to force invalid, by making the pixelref smaller than its
-        // owning bitmap.
-        info.fWidth = 32;
-        info.fHeight = 1;
-        
-        invalidBitmap2.setPixelRef(SkMallocPixelRef::NewAllocate(
-                        info, invalidBitmap2.rowBytes(), NULL))->unref();
+        // Serialize picture
+        SkWriteBuffer writer(SkWriteBuffer::kValidation_Flag);
+        pict->flatten(writer);
+        size_t size = writer.bytesWritten();
+        SkAutoTMalloc<unsigned char> data(size);
+        writer.writeToMemory(static_cast<void*>(data.get()));
 
-        // The deserialization should detect the pixel ref being too small and fail
-        TestBitmapSerialization(validBitmap, invalidBitmap2, false, reporter);
+        // Deserialize picture
+        SkValidatingReadBuffer reader(static_cast<void*>(data.get()), size);
+        SkAutoTUnref<SkPicture> readPict(
+            SkPicture::CreateFromBuffer(reader));
+        REPORTER_ASSERT(reporter, NULL != readPict.get());
     }
 }

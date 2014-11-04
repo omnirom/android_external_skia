@@ -5,8 +5,7 @@
  * found in the LICENSE file.
  */
 
-#include "SkBenchLogger.h"
-#include "BenchTimer.h"
+#include "Timer.h"
 #include "PictureBenchmark.h"
 #include "SkCanvas.h"
 #include "SkPicture.h"
@@ -17,11 +16,13 @@ namespace sk_tools {
 
 PictureBenchmark::PictureBenchmark()
 : fRepeats(1)
-, fLogger(NULL)
 , fRenderer(NULL)
 , fTimerResult(TimerData::kAvg_Result)
 , fTimerTypes(0)
 , fTimeIndividualTiles(false)
+, fPurgeDecodedTex(false)
+, fPreprocess(false)
+, fWriter(NULL)
 {}
 
 PictureBenchmark::~PictureBenchmark() {
@@ -41,19 +42,13 @@ void PictureBenchmark::setTimersToShow(bool wall,
     fTimerTypes |= gpu ? TimerData::kGpu_Flag : 0;
 }
 
-BenchTimer* PictureBenchmark::setupTimer(bool useGLTimer) {
+Timer* PictureBenchmark::setupTimer(bool useGLTimer) {
 #if SK_SUPPORT_GPU
     if (useGLTimer && fRenderer != NULL && fRenderer->isUsingGpuDevice()) {
-        return SkNEW_ARGS(BenchTimer, (fRenderer->getGLContext()));
+        return SkNEW_ARGS(Timer, (fRenderer->getGLContext()));
     }
 #endif
-    return SkNEW_ARGS(BenchTimer, (NULL));
-}
-
-void PictureBenchmark::logProgress(const char msg[]) {
-    if (fLogger != NULL) {
-        fLogger->logProgress(msg);
-    }
+    return SkNEW_ARGS(Timer, (NULL));
 }
 
 PictureRenderer* PictureBenchmark::setRenderer(sk_tools::PictureRenderer* renderer) {
@@ -72,12 +67,29 @@ void PictureBenchmark::run(SkPicture* pict) {
         return;
     }
 
-    fRenderer->init(pict);
+    fRenderer->init(pict, NULL, NULL, NULL, false);
 
     // We throw this away to remove first time effects (such as paging in this program)
     fRenderer->setup();
+
+    if (fPreprocess) {
+        if (NULL != fRenderer->getCanvas()) {
+            fRenderer->getCanvas()->EXPERIMENTAL_optimize(pict);
+        }
+    }
+
     fRenderer->render(NULL);
-    fRenderer->resetState(true);
+    fRenderer->resetState(true);   // flush, swapBuffers and Finish
+
+    if (fPreprocess) {
+        if (NULL != fRenderer->getCanvas()) {
+            fRenderer->getCanvas()->EXPERIMENTAL_purge(pict);
+        }
+    }
+
+    if (fPurgeDecodedTex) {
+        fRenderer->purgeTextures();
+    }
 
     bool usingGpu = false;
 #if SK_SUPPORT_GPU
@@ -96,6 +108,17 @@ void PictureBenchmark::run(SkPicture* pict) {
         timeFormat = fRenderer->getNormalTimeFormat();
     }
 
+    static const int kNumInnerLoops = 10;
+    int numOuterLoops = 1;
+    int numInnerLoops = fRepeats;
+
+    if (TimerData::kPerIter_Result == fTimerResult && fRepeats > 1) {
+        // interpret this flag combination to mean: generate 'fRepeats'
+        // numbers by averaging each rendering 'kNumInnerLoops' times
+        numOuterLoops = fRepeats;
+        numInnerLoops = kNumInnerLoops;
+    }
+
     if (fTimeIndividualTiles) {
         TiledPictureRenderer* tiledRenderer = fRenderer->getTiledRenderer();
         SkASSERT(tiledRenderer && tiledRenderer->supportsTimingIndividualTiles());
@@ -107,15 +130,11 @@ void PictureBenchmark::run(SkPicture* pict) {
             return;
         }
 
-        // Insert a newline so that each tile is reported on its own line (separate from the line
-        // that describes the skp being run).
-        this->logProgress("\n");
-
         int x, y;
         while (tiledRenderer->nextTile(x, y)) {
             // There are two timers, which will behave slightly differently:
             // 1) longRunningTimer, along with perTileTimerData, will time how long it takes to draw
-            // one tile fRepeats times, and take the average. As such, it will not respect thea
+            // one tile fRepeats times, and take the average. As such, it will not respect the
             // logPerIter or printMin options, since it does not know the time per iteration. It
             // will also be unable to call flush() for each tile.
             // The goal of this timer is to make up for a system timer that is not precise enough to
@@ -128,72 +147,116 @@ void PictureBenchmark::run(SkPicture* pict) {
             // seems to cause problems (i.e., INVALID_OPERATIONs) on several
             // platforms. To work around this, we disable the gpu timer on the
             // long running timer.
-            SkAutoTDelete<BenchTimer> longRunningTimer(this->setupTimer());
-            TimerData longRunningTimerData(1);
-            SkAutoTDelete<BenchTimer> perTileTimer(this->setupTimer(false));
-            TimerData perTileTimerData(fRepeats);
-            longRunningTimer->start();
-            for (int i = 0; i < fRepeats; ++i) {
-                perTileTimer->start();
-                tiledRenderer->drawCurrentTile();
-                perTileTimer->truncatedEnd();
-                tiledRenderer->resetState(false);
-                perTileTimer->end();
-                SkAssertResult(perTileTimerData.appendTimes(perTileTimer.get()));
+            SkAutoTDelete<Timer> longRunningTimer(this->setupTimer());
+            TimerData longRunningTimerData(numOuterLoops);
+
+            for (int outer = 0; outer < numOuterLoops; ++outer) {
+                SkAutoTDelete<Timer> perTileTimer(this->setupTimer(false));
+                TimerData perTileTimerData(numInnerLoops);
+
+                longRunningTimer->start();
+                for (int inner = 0; inner < numInnerLoops; ++inner) {
+                    perTileTimer->start();
+                    tiledRenderer->drawCurrentTile();
+                    perTileTimer->truncatedEnd();
+                    tiledRenderer->resetState(false);  // flush & swapBuffers, but don't Finish
+                    perTileTimer->end();
+                    SkAssertResult(perTileTimerData.appendTimes(perTileTimer.get()));
+
+                    if (fPurgeDecodedTex) {
+                        fRenderer->purgeTextures();
+                    }
+                }
+                longRunningTimer->truncatedEnd();
+                tiledRenderer->resetState(true);       // flush, swapBuffers and Finish
+                longRunningTimer->end();
+                SkAssertResult(longRunningTimerData.appendTimes(longRunningTimer.get()));
             }
-            longRunningTimer->truncatedEnd();
-            tiledRenderer->resetState(true);
-            longRunningTimer->end();
-            SkAssertResult(longRunningTimerData.appendTimes(longRunningTimer.get()));
 
-            SkString configName = tiledRenderer->getConfigName();
-            configName.appendf(": tile [%i,%i] out of [%i,%i]", x, y, xTiles, yTiles);
+            fWriter->tileConfig(tiledRenderer->getConfigName());
+            fWriter->tileMeta(x, y, xTiles, yTiles);
 
-            SkString result = perTileTimerData.getResult(timeFormat.c_str(), fTimerResult,
-                                                         configName.c_str(), timerTypes);
-            result.append("\n");
-
-// TODO(borenet): Turn off per-iteration tile time reporting for now.  Avoiding logging the time
-// for every iteration for each tile cuts down on data file size by a significant amount. Re-enable
-// this once we're loading the bench data directly into a data store and are no longer generating
-// SVG graphs.
+            // TODO(borenet): Turn off per-iteration tile time reporting for now.
+            // Avoiding logging the time for every iteration for each tile cuts
+            // down on data file size by a significant amount. Re-enable this once
+            // we're loading the bench data directly into a data store and are no
+            // longer generating SVG graphs.
 #if 0
-            this->logProgress(result.c_str());
+            fWriter->tileData(
+                    &perTileTimerData,
+                    timeFormat.c_str(),
+                    fTimerResult,
+                    timerTypes);
 #endif
 
-            configName.append(" <averaged>");
-            SkString longRunningResult = longRunningTimerData.getResult(
+            if (fPurgeDecodedTex) {
+                fWriter->addTileFlag(PictureResultsWriter::kPurging);
+            }
+            fWriter->addTileFlag(PictureResultsWriter::kAvg);
+            fWriter->tileData(
+                &longRunningTimerData,
                 tiledRenderer->getNormalTimeFormat().c_str(),
                 TimerData::kAvg_Result,
-                configName.c_str(), timerTypes, fRepeats);
-            longRunningResult.append("\n");
-            this->logProgress(longRunningResult.c_str());
+                timerTypes,
+                numInnerLoops);
         }
     } else {
-        SkAutoTDelete<BenchTimer> timer(this->setupTimer());
-        TimerData timerData(fRepeats);
-        for (int i = 0; i < fRepeats; ++i) {
-            fRenderer->setup();
+        SkAutoTDelete<Timer> longRunningTimer(this->setupTimer());
+        TimerData longRunningTimerData(numOuterLoops);
 
-            timer->start();
-            fRenderer->render(NULL);
-            timer->truncatedEnd();
+        for (int outer = 0; outer < numOuterLoops; ++outer) {
+            SkAutoTDelete<Timer> perRunTimer(this->setupTimer(false));
+            TimerData perRunTimerData(numInnerLoops);
 
-            // Finishes gl context
-            fRenderer->resetState(true);
-            timer->end();
+            longRunningTimer->start();
+            for (int inner = 0; inner < numInnerLoops; ++inner) {
+                fRenderer->setup();
 
-            SkAssertResult(timerData.appendTimes(timer.get()));
+                perRunTimer->start();
+                fRenderer->render(NULL);
+                perRunTimer->truncatedEnd();
+                fRenderer->resetState(false);   // flush & swapBuffers, but don't Finish
+                perRunTimer->end();
+
+                SkAssertResult(perRunTimerData.appendTimes(perRunTimer.get()));
+
+                if (fPreprocess) {
+                    if (NULL != fRenderer->getCanvas()) {
+                        fRenderer->getCanvas()->EXPERIMENTAL_purge(pict);
+                    }
+                }
+
+                if (fPurgeDecodedTex) {
+                    fRenderer->purgeTextures();
+                }
+            }
+            longRunningTimer->truncatedEnd();
+            fRenderer->resetState(true);        // flush, swapBuffers and Finish
+            longRunningTimer->end();
+            SkAssertResult(longRunningTimerData.appendTimes(longRunningTimer.get()));
         }
 
-        SkString configName = fRenderer->getConfigName();
+        fWriter->tileConfig(fRenderer->getConfigName());
+        if (fPurgeDecodedTex) {
+            fWriter->addTileFlag(PictureResultsWriter::kPurging);
+        }
 
-        SkString result = timerData.getResult(timeFormat.c_str(),
-                                              fTimerResult,
-                                              configName.c_str(),
-                                              timerTypes);
-        result.append("\n");
-        this->logProgress(result.c_str());
+        // Beware - since the per-run-timer doesn't ever include a glFinish it can
+        // report a lower time then the long-running-timer
+#if 0
+        fWriter->tileData(
+                &perRunTimerData,
+                timeFormat.c_str(),
+                fTimerResult,
+                timerTypes);
+#else
+        fWriter->tileData(
+                &longRunningTimerData,
+                timeFormat.c_str(),
+                fTimerResult,
+                timerTypes,
+                numInnerLoops);
+#endif
     }
 
     fRenderer->end();

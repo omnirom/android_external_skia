@@ -8,7 +8,6 @@
 #include "SkOnce.h"
 #include "SkThreadPool.h"
 #include "Test.h"
-#include "TestClassDef.h"
 
 static void add_five(int* x) {
     *x += 5;
@@ -26,20 +25,6 @@ DEF_TEST(SkOnce_Singlethreaded, r) {
     SkOnce(&once, add_five, &x);
 
     REPORTER_ASSERT(r, 5 == x);
-}
-
-struct AddFour { void operator()(int* x) { *x += 4; } };
-
-DEF_TEST(SkOnce_MiscFeatures, r) {
-    // Tests that we support functors and explicit SkOnceFlags.
-    int x = 0;
-
-    SkOnceFlag once = SK_ONCE_INIT;
-    SkOnce(&once, AddFour(), &x);
-    SkOnce(&once, AddFour(), &x);
-    SkOnce(&once, AddFour(), &x);
-
-    REPORTER_ASSERT(r, 4 == x);
 }
 
 static void add_six(int* x) {
@@ -77,4 +62,15 @@ DEF_TEST(SkOnce_Multithreaded, r) {
 
     // Only one should have done the +=.
     REPORTER_ASSERT(r, 6 == x);
+}
+
+static int gX = 0;
+static void inc_gX() { gX++; }
+
+DEF_TEST(SkOnce_NoArg, r) {
+    SK_DECLARE_STATIC_ONCE(once);
+    SkOnce(&once, inc_gX);
+    SkOnce(&once, inc_gX);
+    SkOnce(&once, inc_gX);
+    REPORTER_ASSERT(r, 1 == gX);
 }

@@ -18,6 +18,10 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() {
         return SkString("bicubicfilter");
     }
@@ -25,9 +29,7 @@ protected:
     void make_checkerboard(int width, int height) {
         SkASSERT(width % 2 == 0);
         SkASSERT(height % 2 == 0);
-        fCheckerboard.setConfig(SkBitmap::kARGB_8888_Config, width, height);
-        fCheckerboard.allocPixels();
-        SkAutoLockPixels lock(fCheckerboard);
+        fCheckerboard.allocN32Pixels(width, height);
         for (int y = 0; y < height; y += 2) {
             SkPMColor* s = fCheckerboard.getAddr32(0, y);
             for (int x = 0; x < width; x += 2) {
@@ -43,7 +45,7 @@ protected:
     }
 
     virtual SkISize onISize() {
-        return make_isize(400, 300);
+        return SkISize::Make(400, 300);
     }
 
     virtual void onDraw(SkCanvas* canvas) {

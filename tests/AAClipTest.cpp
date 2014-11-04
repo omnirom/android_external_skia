@@ -5,12 +5,12 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
 #include "SkAAClip.h"
 #include "SkCanvas.h"
 #include "SkMask.h"
 #include "SkPath.h"
 #include "SkRandom.h"
+#include "Test.h"
 
 static bool operator==(const SkMask& a, const SkMask& b) {
     if (a.fFormat != b.fFormat || a.fBounds != b.fBounds) {
@@ -71,10 +71,12 @@ static void copyToMask(const SkRegion& rgn, SkMask* mask) {
     mask->fImage = SkMask::AllocImage(mask->computeImageSize());
     sk_bzero(mask->fImage, mask->computeImageSize());
 
+    SkImageInfo info = SkImageInfo::Make(mask->fBounds.width(),
+                                         mask->fBounds.height(),
+                                         kAlpha_8_SkColorType,
+                                         kPremul_SkAlphaType);
     SkBitmap bitmap;
-    bitmap.setConfig(SkBitmap::kA8_Config, mask->fBounds.width(),
-                     mask->fBounds.height(), mask->fRowBytes);
-    bitmap.setPixels(mask->fImage);
+    bitmap.installPixels(info, mask->fImage, mask->fRowBytes);
 
     // canvas expects its coordinate system to always be 0,0 in the top/left
     // so we translate the rgn to match that before drawing into the mask.
@@ -394,7 +396,6 @@ static void test_regressions() {
     }
 }
 
-#include "TestClassDef.h"
 DEF_TEST(AAClip, reporter) {
     test_empty(reporter);
     test_path_bounds(reporter);

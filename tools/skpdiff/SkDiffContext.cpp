@@ -107,8 +107,8 @@ void SkDiffContext::addDiff(const char* baselinePath, const char* testPath) {
         diffData.fDiffName = differ->getName();
 
         if (!differ->diff(&baselineBitmap, &testBitmap, alphaMaskPending, &diffData.fResult)) {
-            // if the diff failed the remove its entry from the list
-            newRecord->fDiffs.pop_back();
+            // if the diff failed record -1 as the result
+            diffData.fResult.result = -1;
             continue;
         }
 
@@ -122,7 +122,7 @@ void SkDiffContext::addDiff(const char* baselinePath, const char* testPath) {
 
             // compute the image diff and output it
             SkBitmap copy;
-            diffData.fResult.poiAlphaMask.copyTo(&copy, SkBitmap::kARGB_8888_Config);
+            diffData.fResult.poiAlphaMask.copyTo(&copy, kN32_SkColorType);
             SkImageEncoder::EncodeFile(newRecord->fDifferencePath.c_str(), copy,
                                        SkImageEncoder::kPNG_Type, 100);
 

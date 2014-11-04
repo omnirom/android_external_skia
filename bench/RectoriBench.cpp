@@ -5,16 +5,16 @@
  * found in the LICENSE file.
  */
 
-#include "SkBenchmark.h"
+#include "Benchmark.h"
+#include "SkBlurMaskFilter.h"
 #include "SkCanvas.h"
+#include "SkLayerDrawLooper.h"
 #include "SkPaint.h"
 #include "SkRandom.h"
-#include "SkBlurMaskFilter.h"
-#include "SkLayerDrawLooper.h"
 
 // This bench replicates a problematic use case of a draw looper used
 // to create an inner blurred rect
-class RectoriBench : public SkBenchmark {
+class RectoriBench : public Benchmark {
 public:
     RectoriBench() {}
 
@@ -71,12 +71,11 @@ private:
     };
 
     SkLayerDrawLooper* createLooper(SkScalar xOff, SkScalar sigma) {
-        SkLayerDrawLooper* looper = new SkLayerDrawLooper;
+        SkLayerDrawLooper::Builder looperBuilder;
 
         //-----------------------------------------------
         SkLayerDrawLooper::LayerInfo info;
 
-        info.fFlagsMask = 0;
         // TODO: add a color filter to better match what is seen in the wild
         info.fPaintBits = /* SkLayerDrawLooper::kColorFilter_Bit |*/
                           SkLayerDrawLooper::kMaskFilter_Bit;
@@ -84,9 +83,9 @@ private:
         info.fOffset.set(xOff, 0);
         info.fPostTranslate = false;
 
-        SkPaint* paint = looper->addLayer(info);
+        SkPaint* paint = looperBuilder.addLayer(info);
 
-        SkMaskFilter* mf = SkBlurMaskFilter::Create(SkBlurMaskFilter::kNormal_BlurStyle,
+        SkMaskFilter* mf = SkBlurMaskFilter::Create(kNormal_SkBlurStyle,
                                                     sigma,
                                                     SkBlurMaskFilter::kHighQuality_BlurFlag);
         paint->setMaskFilter(mf)->unref();
@@ -95,11 +94,11 @@ private:
         info.fPaintBits = 0;
         info.fOffset.set(0, 0);
 
-        paint = looper->addLayer(info);
-        return looper;
+        paint = looperBuilder.addLayer(info);
+        return looperBuilder.detachLooper();
     }
 
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 DEF_BENCH( return SkNEW_ARGS(RectoriBench, ()); )

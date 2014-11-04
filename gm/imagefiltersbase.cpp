@@ -18,16 +18,19 @@
 
 class FailImageFilter : public SkImageFilter {
 public:
-    FailImageFilter() : INHERITED(0) {}
+    static FailImageFilter* Create() {
+        return SkNEW(FailImageFilter);
+    }
 
     SK_DECLARE_PUBLIC_FLATTENABLE_DESERIALIZATION_PROCS(FailImageFilter)
 protected:
-    virtual bool onFilterImage(Proxy*, const SkBitmap& src, const SkMatrix&,
-                               SkBitmap* result, SkIPoint* offset) {
+    FailImageFilter() : INHERITED(0) {}
+    virtual bool onFilterImage(Proxy*, const SkBitmap& src, const Context&,
+                               SkBitmap* result, SkIPoint* offset) const SK_OVERRIDE {
         return false;
     }
 
-    FailImageFilter(SkFlattenableReadBuffer& buffer)
+    FailImageFilter(SkReadBuffer& buffer)
       : INHERITED(1, buffer) {}
 
 private:
@@ -41,17 +44,21 @@ static SkFlattenable::Registrar gFailImageFilterReg("FailImageFilter",
 
 class IdentityImageFilter : public SkImageFilter {
 public:
-    IdentityImageFilter() : INHERITED(0) {}
+    static IdentityImageFilter* Create() {
+        return SkNEW(IdentityImageFilter);
+    }
 
     SK_DECLARE_PUBLIC_FLATTENABLE_DESERIALIZATION_PROCS(IdentityImageFilter)
 protected:
-    virtual bool onFilterImage(Proxy*, const SkBitmap& src, const SkMatrix&,
-                               SkBitmap* result, SkIPoint* offset) {
+    IdentityImageFilter() : INHERITED(0) {}
+    virtual bool onFilterImage(Proxy*, const SkBitmap& src, const Context&,
+                               SkBitmap* result, SkIPoint* offset) const SK_OVERRIDE {
         *result = src;
+        offset->set(0, 0);
         return true;
     }
 
-    IdentityImageFilter(SkFlattenableReadBuffer& buffer)
+    IdentityImageFilter(SkReadBuffer& buffer)
       : INHERITED(1, buffer) {}
 
 private:
@@ -119,8 +126,7 @@ static void draw_bitmap(SkCanvas* canvas, const SkRect& r, SkImageFilter* imf) {
     r.roundOut(&bounds);
 
     SkBitmap bm;
-    bm.setConfig(SkBitmap::kARGB_8888_Config, bounds.width(), bounds.height());
-    bm.allocPixels();
+    bm.allocN32Pixels(bounds.width(), bounds.height());
     bm.eraseColor(SK_ColorTRANSPARENT);
     SkCanvas c(bm);
     draw_path(&c, r, NULL);
@@ -136,8 +142,7 @@ static void draw_sprite(SkCanvas* canvas, const SkRect& r, SkImageFilter* imf) {
     r.roundOut(&bounds);
 
     SkBitmap bm;
-    bm.setConfig(SkBitmap::kARGB_8888_Config, bounds.width(), bounds.height());
-    bm.allocPixels();
+    bm.allocN32Pixels(bounds.width(), bounds.height());
     bm.eraseColor(SK_ColorTRANSPARENT);
     SkCanvas c(bm);
     draw_path(&c, r, NULL);
@@ -156,7 +161,6 @@ public:
     ImageFiltersBaseGM () {}
 
 protected:
-
     virtual SkString onShortName() {
         return SkString("imagefiltersbase");
     }
@@ -175,7 +179,7 @@ protected:
         // from scaled replay tests because drawSprite ignores the
         // reciprocal scale that is applied at record time, which is
         // the intended behavior of drawSprite.
-        return kSkipScaledReplay_Flag;
+        return kSkipScaledReplay_Flag | kSkipTiled_Flag;
     }
 
     virtual void onDraw(SkCanvas* canvas) {
@@ -190,11 +194,11 @@ protected:
                                                      SkXfermode::kSrcIn_Mode);
         SkImageFilter* filters[] = {
             NULL,
-            new IdentityImageFilter,
-            new FailImageFilter,
+            IdentityImageFilter::Create(),
+            FailImageFilter::Create(),
             SkColorFilterImageFilter::Create(cf),
-            new SkBlurImageFilter(12.0f, 0.0f),
-            new SkDropShadowImageFilter(10.0f, 5.0f, 3.0f, SK_ColorBLUE),
+            SkBlurImageFilter::Create(12.0f, 0.0f),
+            SkDropShadowImageFilter::Create(10.0f, 5.0f, 3.0f, SK_ColorBLUE),
         };
         cf->unref();
 

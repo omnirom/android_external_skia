@@ -5,7 +5,7 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkCanvas.h"
 #include "SkColorShader.h"
 #include "SkFontHost.h"
@@ -32,7 +32,7 @@ static const char* fontQualityName(const SkPaint& paint) {
     return "AA";
 }
 
-class ShaderMaskBench : public SkBenchmark {
+class ShaderMaskBench : public Benchmark {
     SkPaint     fPaint;
     SkString    fText;
     SkString    fName;
@@ -44,8 +44,7 @@ public:
 
         fPaint.setAntiAlias(kBW != fq);
         fPaint.setLCDRenderText(kLCD == fq);
-        fPaint.setAlpha(isOpaque ? 0xFF : 0x80);
-        fPaint.setShader(new SkColorShader)->unref();
+        fPaint.setShader(new SkColorShader(isOpaque ? 0xFFFFFFFF : 0x80808080))->unref();
     }
 
 protected:
@@ -86,7 +85,7 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

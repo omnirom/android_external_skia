@@ -4,11 +4,11 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkCanvas.h"
 #include "SkPerlinNoiseShader.h"
 
-class PerlinNoiseBench : public SkBenchmark {
+class PerlinNoiseBench : public Benchmark {
     SkISize fSize;
 
 public:
@@ -44,7 +44,7 @@ private:
         SkShader* shader = (type == SkPerlinNoiseShader::kFractalNoise_Type) ?
             SkPerlinNoiseShader::CreateFractalNoise(baseFrequencyX, baseFrequencyY, numOctaves,
                                                     seed, stitchTiles ? &fSize : NULL) :
-            SkPerlinNoiseShader::CreateTubulence(baseFrequencyX, baseFrequencyY, numOctaves,
+            SkPerlinNoiseShader::CreateTurbulence(baseFrequencyX, baseFrequencyY, numOctaves,
                                                  seed, stitchTiles ? &fSize : NULL);
         SkPaint paint;
         paint.setShader(shader)->unref();
@@ -54,7 +54,7 @@ private:
         }
     }
 
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -4,7 +4,7 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkCanvas.h"
 #include "SkColorFilterImageFilter.h"
 #include "SkColorMatrixFilter.h"
@@ -16,7 +16,7 @@
 #define FILTER_WIDTH_LARGE  SkIntToScalar(256)
 #define FILTER_HEIGHT_LARGE SkIntToScalar(256)
 
-class ColorFilterBaseBench : public SkBenchmark {
+class ColorFilterBaseBench : public Benchmark {
 
 public:
     ColorFilterBaseBench(bool small) : fIsSmall(small) { }
@@ -33,7 +33,7 @@ protected:
                                 0, 1, 0, 0, amount255,
                                 0, 0, 1, 0, amount255,
                                 0, 0, 0, 1, 0 };
-        SkAutoTUnref<SkColorFilter> filter(new SkColorMatrixFilter(matrix));
+        SkAutoTUnref<SkColorFilter> filter(SkColorMatrixFilter::Create(matrix));
         return SkColorFilterImageFilter::Create(filter, input);
     }
 
@@ -44,7 +44,7 @@ protected:
         matrix[1] = matrix[6] = matrix[11] = 0.7152f;
         matrix[2] = matrix[7] = matrix[12] = 0.0722f;
         matrix[18] = 1.0f;
-        SkAutoTUnref<SkColorFilter> filter(new SkColorMatrixFilter(matrix));
+        SkAutoTUnref<SkColorFilter> filter(SkColorMatrixFilter::Create(matrix));
         return SkColorFilterImageFilter::Create(filter, input);
     }
 
@@ -58,7 +58,7 @@ protected:
 private:
     bool fIsSmall;
 
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 class ColorFilterDimBrightBench : public ColorFilterBaseBench {

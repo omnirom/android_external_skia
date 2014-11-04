@@ -5,13 +5,16 @@
  * found in the LICENSE file.
  */
 
-#include "BenchTimer.h"
+#include "BenchLogger.h"
+#include "Timer.h"
 #include "CopyTilesRenderer.h"
+#include "CrashHandler.h"
 #include "LazyDecodeBitmap.h"
 #include "PictureBenchmark.h"
 #include "PictureRenderingFlags.h"
-#include "SkBenchLogger.h"
+#include "PictureResultsWriter.h"
 #include "SkCommandLineFlags.h"
+#include "SkData.h"
 #include "SkDiscardableMemoryPool.h"
 #include "SkGraphics.h"
 #include "SkImageDecoder.h"
@@ -21,7 +24,9 @@
 #include "SkStream.h"
 #include "picture_utils.h"
 
-SkBenchLogger gLogger;
+BenchLogger gLogger;
+PictureResultsLoggerWriter gLogWriter(&gLogger);
+PictureResultsMultiWriter gWriter;
 
 // Flags used by this file, in alphabetical order.
 DEFINE_bool(countRAM, false, "Count the RAM used for bitmap pixels in each skp file");
@@ -35,17 +40,22 @@ DEFINE_string(filter, "",
         "Specific flags are listed above.");
 DEFINE_string(logFile, "", "Destination for writing log output, in addition to stdout.");
 DEFINE_bool(logPerIter, false, "Log each repeat timer instead of mean.");
+DEFINE_string(jsonLog, "", "Destination for writing JSON data.");
 DEFINE_bool(min, false, "Print the minimum times (instead of average).");
 DECLARE_int32(multi);
 DECLARE_string(readPath);
 DEFINE_int32(repeat, 1, "Set the number of times to repeat each test.");
 DEFINE_bool(timeIndividualTiles, false, "Report times for drawing individual tiles, rather than "
             "times for drawing the whole page. Requires tiled rendering.");
+DEFINE_bool(purgeDecodedTex, false, "Purge decoded and GPU-uploaded textures "
+            "after each iteration.");
 DEFINE_string(timers, "c", "[wcgWC]*: Display wall, cpu, gpu, truncated wall or truncated cpu time"
               " for each picture.");
 DEFINE_bool(trackDeferredCaching, false, "Only meaningful with --deferImageDecoding and "
-            "LAZY_CACHE_STATS set to true. Report percentage of cache hits when using deferred "
-            "image decoding.");
+            "SK_LAZY_CACHE_STATS set to true. Report percentage of cache hits when using "
+            "deferred image decoding.");
+
+DEFINE_bool(preprocess, false, "If true, perform device specific preprocessing before timing.");
 
 static char const * const gFilterTypes[] = {
     "paint",
@@ -140,7 +150,7 @@ static SkString filterFlagsUsage() {
     return result;
 }
 
-#if LAZY_CACHE_STATS
+#if SK_LAZY_CACHE_STATS
 static int32_t gTotalCacheHits;
 static int32_t gTotalCacheMisses;
 #endif
@@ -180,21 +190,17 @@ static bool run_single_benchmark(const SkString& inputPath,
         return false;
     }
 
-    SkString filename;
-    sk_tools::get_basename(&filename, inputPath);
+    SkString filename = SkOSPath::SkBasename(inputPath.c_str());
 
-    SkString result;
-    result.printf("running bench [%i %i] %s ", picture->width(), picture->height(),
-                  filename.c_str());
-    gLogger.logProgress(result);
+    gWriter.bench(filename.c_str(), picture->width(), picture->height());
 
     benchmark.run(picture);
 
-#if LAZY_CACHE_STATS
+#if SK_LAZY_CACHE_STATS
     if (FLAGS_trackDeferredCaching) {
-        int32_t cacheHits = pool->fCacheHits;
-        int32_t cacheMisses = pool->fCacheMisses;
-        pool->fCacheHits = pool->fCacheMisses = 0;
+        int cacheHits = pool->getCacheHits();
+        int cacheMisses = pool->getCacheMisses();
+        pool->resetCacheHitsAndMisses();
         SkString hitString;
         hitString.printf("Cache hit rate: %f\n", (double) cacheHits / (cacheHits + cacheMisses));
         gLogger.logProgress(hitString);
@@ -338,6 +344,9 @@ static void setup_benchmark(sk_tools::PictureBenchmark* benchmark) {
         benchmark->setTimeIndividualTiles(true);
     }
 
+    benchmark->setPurgeDecodedTex(FLAGS_purgeDecodedTex);
+    benchmark->setPreprocess(FLAGS_preprocess);
+
     if (FLAGS_readPath.count() < 1) {
         gLogger.logError(".skp files or directories are required.\n");
         exit(-1);
@@ -353,7 +362,7 @@ static void setup_benchmark(sk_tools::PictureBenchmark* benchmark) {
     }
     benchmark->setRenderer(renderer);
     benchmark->setRepeats(FLAGS_repeat);
-    benchmark->setLogger(&gLogger);
+    benchmark->setWriter(&gWriter);
 }
 
 static int process_input(const char* input,
@@ -364,8 +373,7 @@ static int process_input(const char* input,
     int failures = 0;
     if (iter.next(&inputFilename)) {
         do {
-            SkString inputPath;
-            sk_tools::make_filepath(&inputPath, inputAsSkString, inputFilename);
+            SkString inputPath = SkOSPath::SkPathJoin(input, inputFilename.c_str());
             if (!run_single_benchmark(inputPath, benchmark)) {
                 ++failures;
             }
@@ -384,6 +392,7 @@ static int process_input(const char* input,
 
 int tool_main(int argc, char** argv);
 int tool_main(int argc, char** argv) {
+    SetupCrashHandler();
     SkString usage;
     usage.printf("Time drawing .skp files.\n"
                  "\tPossible arguments for --filter: [%s]\n\t\t[%s]",
@@ -410,6 +419,14 @@ int tool_main(int argc, char** argv) {
         }
     }
 
+    SkAutoTDelete<PictureJSONResultsWriter> jsonWriter;
+    if (FLAGS_jsonLog.count() == 1) {
+        jsonWriter.reset(SkNEW(PictureJSONResultsWriter(FLAGS_jsonLog[0])));
+        gWriter.add(jsonWriter.get());
+    }
+
+    gWriter.add(&gLogWriter);
+
 
 #if SK_ENABLE_INST_COUNT
     gPrintInstCount = true;
@@ -431,12 +448,13 @@ int tool_main(int argc, char** argv) {
         gLogger.logError(err);
         return 1;
     }
-#if LAZY_CACHE_STATS
+#if SK_LAZY_CACHE_STATS
     if (FLAGS_trackDeferredCaching) {
         SkDebugf("Total cache hit rate: %f\n",
                  (double) gTotalCacheHits / (gTotalCacheHits + gTotalCacheMisses));
     }
 #endif
+    gWriter.end();
     return 0;
 }
 

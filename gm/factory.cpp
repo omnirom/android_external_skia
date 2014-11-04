@@ -6,12 +6,15 @@
  */
 
 #include "gm.h"
+
+#include "Resources.h"
 #include "SkCanvas.h"
 #include "SkData.h"
 #include "SkDecodingImageGenerator.h"
 #include "SkDiscardableMemoryPool.h"
 #include "SkDiscardablePixelRef.h"
 #include "SkImageDecoder.h"
+#include "SkImageGeneratorPriv.h"
 #include "SkOSFile.h"
 #include "SkStream.h"
 
@@ -26,17 +29,19 @@ public:
 
 protected:
     virtual void onOnceBeforeDraw() SK_OVERRIDE {
+        SkString resourcePath = GetResourcePath();
         // Copyright-free file from http://openclipart.org/detail/29213/paper-plane-by-ddoo
-        SkString filename = SkOSPath::SkPathJoin(INHERITED::gResourcePath.c_str(),
-                                                 "plane.png");
+        SkString filename = SkOSPath::SkPathJoin(resourcePath.c_str(), "plane.png");
         SkAutoDataUnref data(SkData::NewFromFileName(filename.c_str()));
         if (NULL != data.get()) {
             // Create a cache which will boot the pixels out anytime the
             // bitmap is unlocked.
             SkAutoTUnref<SkDiscardableMemoryPool> pool(
-                SkNEW_ARGS(SkDiscardableMemoryPool, (1)));
-            SkAssertResult(SkDecodingImageGenerator::Install(data,
-                                                             &fBitmap, pool));
+                SkDiscardableMemoryPool::Create(1));
+            SkAssertResult(SkInstallDiscardablePixelRef(
+                SkDecodingImageGenerator::Create(
+                    data, SkDecodingImageGenerator::Options()),
+                &fBitmap, pool));
         }
     }
 
@@ -45,7 +50,7 @@ protected:
     }
 
     virtual SkISize onISize() {
-        return make_isize(640, 480);
+        return SkISize::Make(640, 480);
     }
 
     virtual void onDraw(SkCanvas* canvas) {
@@ -68,4 +73,4 @@ private:
 static GM* MyFactory(void*) { return new FactoryGM; }
 static GMRegistry reg(MyFactory);
 
-}
+}  // namespace skiagm

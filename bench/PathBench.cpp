@@ -5,7 +5,7 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkBitmap.h"
 #include "SkCanvas.h"
 #include "SkColorPriv.h"
@@ -25,7 +25,7 @@ enum Flags {
 #define FLAGS10  Flags(kBig_Flag)
 #define FLAGS11  Flags(kStroke_Flag | kBig_Flag)
 
-class PathBench : public SkBenchmark {
+class PathBench : public Benchmark {
     SkPaint     fPaint;
     SkString    fName;
     Flags       fFlags;
@@ -74,7 +74,7 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 class TrianglePathBench : public PathBench {
@@ -214,7 +214,7 @@ private:
     typedef PathBench INHERITED;
 };
 
-class RandomPathBench : public SkBenchmark {
+class RandomPathBench : public Benchmark {
 public:
     virtual bool isSuitableFor(Backend backend) SK_OVERRIDE {
         return backend == kNonRendering_Backend;
@@ -312,7 +312,7 @@ private:
     int                         fCurrVerb;
     int                         fCurrPoint;
     SkRandom                    fRandom;
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 class PathCreateBench : public RandomPathBench {
@@ -327,27 +327,20 @@ protected:
 
     virtual void onPreDraw() SK_OVERRIDE {
         this->createData(10, 100);
-        fPaths.reset(kPathCnt);
     }
 
     virtual void onDraw(const int loops, SkCanvas*) SK_OVERRIDE {
         for (int i = 0; i < loops; ++i) {
-            this->makePath(&fPaths[i & (kPathCnt - 1)]);
+            if (i % 1000 == 0) {
+                fPath.reset();  // PathRef memory can grow without bound otherwise.
+            }
+            this->makePath(&fPath);
         }
         this->restartMakingPaths();
     }
 
-    virtual void onPostDraw() SK_OVERRIDE {
-        this->finishedMakingPaths();
-        fPaths.reset(0);
-    }
-
 private:
-    enum {
-        // must be a pow 2
-        kPathCnt = 1 << 5,
-    };
-    SkAutoTArray<SkPath> fPaths;
+    SkPath fPath;
 
     typedef RandomPathBench INHERITED;
 };
@@ -375,10 +368,6 @@ protected:
             int idx = i & (kPathCnt - 1);
             fCopies[idx] = fPaths[idx];
         }
-    }
-    virtual void onPostDraw() SK_OVERRIDE {
-        fPaths.reset(0);
-        fCopies.reset(0);
     }
 
 private:
@@ -427,11 +416,6 @@ protected:
         }
     }
 
-    virtual void onPostDraw() SK_OVERRIDE {
-        fPaths.reset(0);
-        fTransformed.reset(0);
-    }
-
 private:
     enum {
         // must be a pow 2
@@ -471,11 +455,6 @@ protected:
             int idx = i & (kPathCnt - 1);
             fParity ^= (fPaths[idx] == fCopies[idx & ~0x1]);
         }
-    }
-
-    virtual void onPostDraw() SK_OVERRIDE {
-        fPaths.reset(0);
-        fCopies.reset(0);
     }
 
 private:
@@ -575,11 +554,6 @@ protected:
         }
     }
 
-    virtual void onPostDraw() SK_OVERRIDE {
-        fPaths0.reset(0);
-        fPaths1.reset(0);
-    }
-
 private:
     AddType fType; // or reverseAddPath
     enum {
@@ -593,7 +567,7 @@ private:
 };
 
 
-class CirclesBench : public SkBenchmark {
+class CirclesBench : public Benchmark {
 protected:
     SkString            fName;
     Flags               fFlags;
@@ -645,7 +619,7 @@ protected:
     }
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 
@@ -654,7 +628,7 @@ private:
 // Note: PathTest::test_arb_round_rect_is_convex and
 // test_arb_zero_rad_round_rect_is_rect perform almost exactly
 // the same test (but with no drawing)
-class ArbRoundRectBench : public SkBenchmark {
+class ArbRoundRectBench : public Benchmark {
 protected:
     SkString            fName;
 
@@ -749,10 +723,10 @@ protected:
 private:
     bool fZeroRad;      // should 0 radius rounds rects be tested?
 
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
-class ConservativelyContainsBench : public SkBenchmark {
+class ConservativelyContainsBench : public Benchmark {
 public:
     enum Type {
         kRect_Type,
@@ -811,10 +785,6 @@ private:
         }
     }
 
-    virtual void onPostDraw() SK_OVERRIDE {
-        fQueryRects.setCount(0);
-    }
-
     enum {
         kQueryRectCnt = 400,
     };
@@ -829,14 +799,14 @@ private:
     bool                fParity;
     SkTDArray<SkRect>   fQueryRects;
 
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "SkGeometry.h"
 
-class ConicBench_Chop5 : public SkBenchmark {
+class ConicBench_Chop5 : public Benchmark {
     SkConic fRQ;
 public:
     ConicBench_Chop5()  {
@@ -858,10 +828,10 @@ private:
         }
     }
 
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
-class ConicBench_ChopHalf : public SkBenchmark {
+class ConicBench_ChopHalf : public Benchmark {
     SkConic fRQ;
 public:
     ConicBench_ChopHalf()  {
@@ -883,7 +853,7 @@ private:
         }
     }
 
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -899,7 +869,7 @@ static void rand_conic(SkConic* conic, SkRandom& rand) {
     }
 }
 
-class ConicBench : public SkBenchmark {
+class ConicBench : public Benchmark {
 public:
     ConicBench()  {
         SkRandom rand;
@@ -919,7 +889,7 @@ protected:
     SkConic fConics[CONICS];
 
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 class ConicBench_ComputeError : public ConicBench {

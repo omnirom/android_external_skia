@@ -6,16 +6,17 @@
  */
 
 #include "gm.h"
+
 using namespace skiagm;
 
-SkString GM::gResourcePath;
-
 GM::GM() {
+    fMode = kGM_Mode;
     fBGColor = SK_ColorWHITE;
     fCanvasIsDeferred = false;
     fHaveCalledOnceBeforeDraw = false;
     fStarterMatrix.reset();
 }
+
 GM::~GM() {}
 
 void GM::draw(SkCanvas* canvas) {
@@ -39,7 +40,7 @@ void GM::drawBackground(SkCanvas* canvas) {
     this->onDrawBackground(canvas);
 }
 
-const char* GM::shortName() {
+const char* GM::getName() {
     if (fShortName.size() == 0) {
         fShortName = this->onShortName();
     }
@@ -64,4 +65,4 @@ void GM::drawSizeBounds(SkCanvas* canvas, SkColor color) {
 }
 
 // need to explicitly declare this, or we get some weird infinite loop llist
-template GMRegistry* SkTRegistry<GM*(*)(void*)>::gHead;
+template GMRegistry* GMRegistry::gHead;

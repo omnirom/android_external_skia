@@ -6,6 +6,8 @@
  */
 
 #include "gm.h"
+
+#include "Resources.h"
 #include "SkCanvas.h"
 #include "SkStream.h"
 #include "SkTypeface.h"
@@ -22,9 +24,12 @@ public:
         SkSafeUnref(fTypeface);
     }
 protected:
-    virtual void onOnceBeforeDraw() SK_OVERRIDE {
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
 
-        SkString filename(INHERITED::gResourcePath);
+    virtual void onOnceBeforeDraw() SK_OVERRIDE {
+        SkString filename = GetResourcePath();
         filename.append("/Funkster.ttf");
 
         SkAutoTUnref<SkFILEStream> stream(new SkFILEStream(filename.c_str()));
@@ -41,7 +46,7 @@ protected:
     }
 
     virtual SkISize onISize() {
-        return make_isize(640, 480);
+        return SkISize::Make(640, 480);
     }
 
     virtual void onDraw(SkCanvas* canvas) {
@@ -109,10 +114,7 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-#if !defined(SK_BUILD_FOR_ANDROID)
-// fail for now until the appropriate freetype changes are submitted
 static GM* MyFactory(void*) { return new ColorEmojiGM; }
 static GMRegistry reg(MyFactory);
-#endif
 
 }

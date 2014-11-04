@@ -13,32 +13,22 @@ namespace DM {
 SerializeTask::SerializeTask(const Task& parent,
                              skiagm::GM* gm,
                              SkBitmap reference)
-    : Task(parent)
+    : CpuTask(parent)
     , fName(UnderJoin(parent.name().c_str(), "serialize"))
     , fGM(gm)
     , fReference(reference)
     {}
 
-static SkData* trivial_bitmap_encoder(size_t* pixelRefOffset, const SkBitmap& bitmap) {
-    if (NULL == bitmap.pixelRef()) {
-        return NULL;
-    }
-    SkData* data = bitmap.pixelRef()->refEncodedData();
-    *pixelRefOffset = bitmap.pixelRefOffset();
-    return data;
-}
-
 void SerializeTask::draw() {
-    SkPicture recorded;
-    RecordPicture(fGM.get(), &recorded);
+    SkAutoTUnref<SkPicture> recorded(RecordPicture(fGM.get()));
 
     SkDynamicMemoryWStream wStream;
-    recorded.serialize(&wStream, &trivial_bitmap_encoder);
+    recorded->serialize(&wStream, NULL);
     SkAutoTUnref<SkStream> rStream(wStream.detachAsStream());
     SkAutoTUnref<SkPicture> reconstructed(SkPicture::CreateFromStream(rStream));
 
     SkBitmap bitmap;
-    SetupBitmap(fReference.config(), fGM.get(), &bitmap);
+    AllocatePixels(fReference, &bitmap);
     DrawPicture(reconstructed, &bitmap);
     if (!BitmapsEqual(bitmap, fReference)) {
         this->fail();

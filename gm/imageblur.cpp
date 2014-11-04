@@ -16,22 +16,28 @@ namespace skiagm {
 
 class ImageBlurGM : public GM {
 public:
-    ImageBlurGM() {
+    ImageBlurGM(SkScalar sigmaX, SkScalar sigmaY, const char* suffix)
+        : fSigmaX(sigmaX), fSigmaY(sigmaY) {
         this->setBGColor(0xFF000000);
+        fName.printf("imageblur%s", suffix);
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() {
-        return SkString("imageblur");
+        return fName;
     }
 
     virtual SkISize onISize() {
-        return make_isize(WIDTH, HEIGHT);
+        return SkISize::Make(WIDTH, HEIGHT);
     }
 
     virtual void onDraw(SkCanvas* canvas) {
         SkPaint paint;
-        paint.setImageFilter(new SkBlurImageFilter(24.0f, 0.0f))->unref();
+        paint.setImageFilter(SkBlurImageFilter::Create(fSigmaX, fSigmaY))->unref();
         canvas->saveLayer(NULL, &paint);
         const char* str = "The quick brown fox jumped over the lazy dog.";
 
@@ -50,12 +56,19 @@ protected:
     }
 
 private:
+    SkScalar fSigmaX;
+    SkScalar fSigmaY;
+    SkString fName;
+
     typedef GM INHERITED;
 };
 
 //////////////////////////////////////////////////////////////////////////////
 
-static GM* MyFactory(void*) { return new ImageBlurGM; }
-static GMRegistry reg(MyFactory);
+static GM* MyFactory1(void*) { return new ImageBlurGM(24.0f, 0.0f, ""); }
+static GMRegistry reg1(MyFactory1);
+
+static GM* MyFactory2(void*) { return new ImageBlurGM(80.0f, 80.0f, "_large"); }
+static GMRegistry reg2(MyFactory2);
 
 }

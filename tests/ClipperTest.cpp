@@ -5,17 +5,15 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
-#include "TestClassDef.h"
 #include "SkCanvas.h"
 #include "SkEdgeClipper.h"
 #include "SkLineClipper.h"
 #include "SkPath.h"
+#include "Test.h"
 
 static void test_hairclipping(skiatest::Reporter* reporter) {
     SkBitmap bm;
-    bm.setConfig(SkBitmap::kARGB_8888_Config, 4, 4);
-    bm.allocPixels();
+    bm.allocN32Pixels(4, 4);
     bm.eraseColor(SK_ColorWHITE);
 
     SkPaint paint;

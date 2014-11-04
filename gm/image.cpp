@@ -153,11 +153,12 @@ protected:
 
         static const char* kLabel8 = "Pre-Alloc Img";
         static const char* kLabel9 = "New Alloc Img";
-        static const char* kLabel10 = "SkPicture";
-        static const char* kLabel11 = "Null Paint";
-        static const char* kLabel12 = "GPU";
+        static const char* kLabel10 = "Null Paint";
+        static const char* kLabel11 = "GPU";
 
         SkPaint textPaint;
+        textPaint.setAntiAlias(true);
+        textPaint.setTextSize(8);
 
         canvas->drawText(kLabel1, strlen(kLabel1), 10,  60, textPaint);
         canvas->drawText(kLabel2, strlen(kLabel2), 10, 140, textPaint);
@@ -171,20 +172,15 @@ protected:
         canvas->drawText(kLabel9, strlen(kLabel9), 160, 10, textPaint);
         canvas->drawText(kLabel10, strlen(kLabel10), 250, 10, textPaint);
         canvas->drawText(kLabel11, strlen(kLabel11), 320, 10, textPaint);
-        canvas->drawText(kLabel12, strlen(kLabel12), 410, 10, textPaint);
 
         canvas->translate(80, 20);
 
         // since we draw into this directly, we need to start fresh
         sk_bzero(fBuffer, fBufferSize);
 
-        SkImageInfo info = {
-            W, H, kPMColor_SkColorType, kPremul_SkAlphaType
-        };
+        SkImageInfo info = SkImageInfo::MakeN32Premul(W, H);
         SkAutoTUnref<SkSurface> surf0(SkSurface::NewRasterDirect(info, fBuffer, RB));
         SkAutoTUnref<SkSurface> surf1(SkSurface::NewRaster(info));
-        SkAutoTUnref<SkSurface> surf2(SkSurface::NewPicture(info.fWidth, info.fHeight));
-        SkAutoTUnref<SkSurface> surf3(SkSurface::NewPicture(info.fWidth, info.fHeight));
 #if SK_SUPPORT_GPU
         GrContext* ctx = canvas->getGrContext();
 
@@ -194,10 +190,6 @@ protected:
         test_surface(canvas, surf0, true);
         canvas->translate(80, 0);
         test_surface(canvas, surf1, true);
-        canvas->translate(80, 0);
-        test_surface(canvas, surf2, true);
-        canvas->translate(80, 0);
-        test_surface(canvas, surf3, false);
 #if SK_SUPPORT_GPU
         if (NULL != ctx) {
             canvas->translate(80, 0);

@@ -19,12 +19,16 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() {
         return SkString("fontscaler");
     }
 
     virtual SkISize onISize() {
-        return make_isize(1450, 750);
+        return SkISize::Make(1450, 750);
     }
 
     static void rotate_about(SkCanvas* canvas,

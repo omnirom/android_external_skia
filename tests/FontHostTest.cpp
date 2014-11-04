@@ -5,14 +5,14 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
-#include "TestClassDef.h"
-#include "SkPaint.h"
+#include "Resources.h"
+#include "SkEndian.h"
 #include "SkFontStream.h"
 #include "SkOSFile.h"
+#include "SkPaint.h"
 #include "SkStream.h"
 #include "SkTypeface.h"
-#include "SkEndian.h"
+#include "Test.h"
 
 //#define DUMP_TABLES
 //#define DUMP_TTC_TABLES
@@ -46,9 +46,6 @@ static void test_unitsPerEm(skiatest::Reporter* reporter, SkTypeface* face) {
 
     if (tableUPEM >= 0) {
         REPORTER_ASSERT(reporter, tableUPEM == nativeUPEM);
-    } else {
-        // not sure this is a bug, but lets report it for now as info.
-        SkDebugf("--- typeface returned 0 upem [%X]\n", face->uniqueID());
     }
 }
 
@@ -68,9 +65,6 @@ static void test_countGlyphs(skiatest::Reporter* reporter, SkTypeface* face) {
 
     if (tableGlyphs >= 0) {
         REPORTER_ASSERT(reporter, tableGlyphs == nativeGlyphs);
-    } else {
-        // not sure this is a bug, but lets report it for now as info.
-        SkDebugf("--- typeface returned 0 glyphs [%X]\n", face->uniqueID());
     }
 }
 
@@ -156,7 +150,7 @@ static void test_fontstream(skiatest::Reporter* reporter, SkStream* stream) {
 
 static void test_fontstream(skiatest::Reporter* reporter) {
     // This test cannot run if there is no resource path.
-    SkString resourcePath = skiatest::Test::GetResourcePath();
+    SkString resourcePath = GetResourcePath();
     if (resourcePath.isEmpty()) {
         SkDebugf("Could not run fontstream test because resourcePath not specified.");
         return;

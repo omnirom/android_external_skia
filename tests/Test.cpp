@@ -1,16 +1,17 @@
-
 /*
  * Copyright 2011 Google Inc.
  *
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
+
 #include "Test.h"
 
+#include "SkCommandLineFlags.h"
+#include "SkError.h"
 #include "SkString.h"
 #include "SkTArray.h"
 #include "SkTime.h"
-#include "SkError.h"
 
 #if SK_SUPPORT_GPU
 #include "GrContext.h"
@@ -19,13 +20,14 @@
 class GrContext;
 #endif
 
+DEFINE_string2(tmpDir, t, NULL, "tmp directory for tests to use.");
+
 using namespace skiatest;
 
 Reporter::Reporter() : fTestCount(0) {
 }
 
 void Reporter::startTest(Test* test) {
-    this->bumpTestCount();
     this->onStart(test);
 }
 
@@ -56,41 +58,39 @@ const char* Test::getName() {
     return fName.c_str();
 }
 
-namespace {
-    class LocalReporter : public Reporter {
-    public:
-        explicit LocalReporter(Reporter* reporterToMimic) : fReporter(reporterToMimic) {}
+class LocalReporter : public Reporter {
+public:
+    explicit LocalReporter(Reporter* reporterToMimic) : fReporter(reporterToMimic) {}
 
-        int failure_size() const { return fFailures.count(); }
-        const SkString& failure(int i) const { return fFailures[i]; }
+    int numFailures() const { return fFailures.count(); }
+    const SkString& failure(int i) const { return fFailures[i]; }
 
-    protected:
-        void onReportFailed(const SkString& desc) SK_OVERRIDE {
-            fFailures.push_back(desc);
-        }
+protected:
+    virtual void onReportFailed(const SkString& desc) SK_OVERRIDE {
+        fFailures.push_back(desc);
+    }
 
-        // Proxy down to fReporter.  We assume these calls are threadsafe.
-        virtual bool allowExtendedTest() const SK_OVERRIDE {
-            return fReporter->allowExtendedTest();
-        }
+    // Proxy down to fReporter.  We assume these calls are threadsafe.
+    virtual bool allowExtendedTest() const SK_OVERRIDE {
+        return fReporter->allowExtendedTest();
+    }
 
-        virtual bool allowThreaded() const SK_OVERRIDE {
-            return fReporter->allowThreaded();
-        }
+    virtual bool allowThreaded() const SK_OVERRIDE {
+        return fReporter->allowThreaded();
+    }
 
-        virtual void bumpTestCount() SK_OVERRIDE {
-            fReporter->bumpTestCount();
-        }
+    virtual void bumpTestCount() SK_OVERRIDE {
+        fReporter->bumpTestCount();
+    }
 
-        virtual bool verbose() const SK_OVERRIDE {
-            return fReporter->verbose();
-        }
+    virtual bool verbose() const SK_OVERRIDE {
+        return fReporter->verbose();
+    }
 
-    private:
-        Reporter* fReporter;  // Unowned.
-        SkTArray<SkString> fFailures;
-    };
-}  // namespace
+private:
+    Reporter* fReporter;  // Unowned.
+    SkTArray<SkString> fFailures;
+};
 
 void Test::run() {
     // Clear the Skia error callback before running any test, to ensure that tests
@@ -105,34 +105,18 @@ void Test::run() {
     // from other tests that might share fReporter.
     LocalReporter local(fReporter);
     this->onRun(&local);
-    fPassed = local.failure_size() == 0;
+    fPassed = local.numFailures() == 0;
     fElapsed = SkTime::GetMSecs() - start;
 
     // Now tell fReporter about any failures and wrap up.
-    for (int i = 0; i < local.failure_size(); i++) {
+    for (int i = 0; i < local.numFailures(); i++) {
       fReporter->reportFailed(local.failure(i));
     }
     fReporter->endTest(this);
 
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-#if SK_SUPPORT_GPU
-#include "GrContextFactory.h"
-GrContextFactory gGrContextFactory;
-#endif
-
-GrContextFactory* GpuTest::GetGrContextFactory() {
-#if SK_SUPPORT_GPU
-    return &gGrContextFactory;
-#else
-    return NULL;
-#endif
-}
-
-void GpuTest::DestroyContexts() {
-#if SK_SUPPORT_GPU
-    gGrContextFactory.destroyContexts();
-#endif
+SkString Test::GetTmpDir() {
+    const char* tmpDir = FLAGS_tmpDir.isEmpty() ? NULL : FLAGS_tmpDir[0];
+    return SkString(tmpDir);
 }

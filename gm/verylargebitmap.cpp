@@ -11,8 +11,7 @@
 #include "SkPath.h"
 
 static void make_bm(SkBitmap* bm, int width, int height, SkColor colors[2]) {
-    bm->setConfig(SkBitmap::kARGB_8888_Config, width, height);
-    bm->allocPixels();
+    bm->allocN32Pixels(width, height);
     SkCanvas canvas(*bm);
     SkPoint center = {SkIntToScalar(width)/2, SkIntToScalar(height)/2};
     SkScalar radius = 40;
@@ -110,7 +109,7 @@ protected:
                kSkipTiled_Flag              |
                kSkipScaledReplay_Flag;
 #else
-        return 0;
+        return kSkipTiled_Flag;
 #endif
     }
 
@@ -120,8 +119,5 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-// This GM allocates more memory than Android devices are capable of fulfilling.
-#ifndef SK_BUILD_FOR_ANDROID
 static skiagm::GM* MyFactory(void*) { return new VeryLargeBitmapGM; }
 static skiagm::GMRegistry reg(MyFactory);
-#endif

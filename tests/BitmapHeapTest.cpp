@@ -9,25 +9,18 @@
 #include "SkBitmapHeap.h"
 #include "SkColor.h"
 #include "SkFlattenable.h"
-#include "SkOrderedWriteBuffer.h"
+#include "SkWriteBuffer.h"
 #include "SkPictureFlat.h"
 #include "SkRefCnt.h"
 #include "SkShader.h"
 #include "Test.h"
-#include "TestClassDef.h"
 
-class FlatDictionary : public SkFlatDictionary<SkShader> {
-
-public:
-    FlatDictionary(SkFlatController* controller)
-    : SkFlatDictionary<SkShader>(controller) {
-        fFlattenProc = &flattenFlattenableProc;
-        // No need for an unflattenProc
-    }
-    static void flattenFlattenableProc(SkOrderedWriteBuffer& buffer, const void* obj) {
-        buffer.writeFlattenable((SkFlattenable*)obj);
+struct SkShaderTraits {
+    static void Flatten(SkWriteBuffer& buffer, const SkShader& shader) {
+        buffer.writeFlattenable(&shader);
     }
 };
+typedef SkFlatDictionary<SkShader, SkShaderTraits> FlatDictionary;
 
 class SkBitmapHeapTester {
 
@@ -40,8 +33,7 @@ public:
 DEF_TEST(BitmapHeap, reporter) {
     // Create a bitmap shader.
     SkBitmap bm;
-    bm.setConfig(SkBitmap::kARGB_8888_Config, 2, 2);
-    bm.allocPixels();
+    bm.allocN32Pixels(2, 2);
     bm.eraseColor(SK_ColorRED);
     uint32_t* pixel = bm.getAddr32(1,0);
     *pixel = SK_ColorBLUE;

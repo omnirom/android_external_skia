@@ -26,12 +26,16 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() SK_OVERRIDE {
         return SkString("ovals");
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        return make_isize(1200, 900);
+        return SkISize::Make(1200, 900);
     }
 
     void makePaints() {

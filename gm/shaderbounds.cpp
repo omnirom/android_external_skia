@@ -9,7 +9,8 @@
 
 namespace skiagm {
 
-static SkShader* MakeLinear(SkScalar width, SkScalar height, bool alternate) {
+static SkShader* MakeLinear(SkScalar width, SkScalar height, bool alternate,
+                            const SkMatrix& localMatrix) {
   SkPoint pts[2] = { {0, 0}, {width, height}};
   SkColor colors[2] = {SK_ColorRED, SK_ColorGREEN};
   if (alternate) {
@@ -18,7 +19,7 @@ static SkShader* MakeLinear(SkScalar width, SkScalar height, bool alternate) {
     colors[1] = SK_ColorYELLOW;
   }
   return SkGradientShader::CreateLinear(pts, colors, NULL, 2,
-                                        SkShader::kClamp_TileMode, NULL);
+                                        SkShader::kClamp_TileMode, 0, &localMatrix);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -26,18 +27,22 @@ static SkShader* MakeLinear(SkScalar width, SkScalar height, bool alternate) {
 class ShaderBoundsGM : public GM {
 public:
     typedef SkShader* (*ShaderGenFunc)(SkScalar width, SkScalar height,
-                                       bool alternate);
+                                       bool alternate, const SkMatrix& localMatrix);
     ShaderBoundsGM(ShaderGenFunc maker, const SkString& name)
         : fShaderMaker(maker),
           fName(name) {
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     SkString onShortName() {
         return fName;
     }
 
-    virtual SkISize onISize() { return make_isize(320, 240); }
+    virtual SkISize onISize() { return SkISize::Make(320, 240); }
 
     virtual SkMatrix onGetInitialTransform() const SK_OVERRIDE {
         SkMatrix result;
@@ -80,10 +85,9 @@ protected:
         }
         SkScalar shaderWidth = SkScalarDiv(SkIntToScalar(width), scale);
         SkScalar shaderHeight = SkScalarDiv(SkIntToScalar(height), scale);
-        SkShader* shader = fShaderMaker(shaderWidth, shaderHeight, background);
         SkMatrix shaderScale;
         shaderScale.setScale(scale, scale);
-        shader->setLocalMatrix(shaderScale);
+        SkShader* shader = fShaderMaker(shaderWidth, shaderHeight, background, shaderScale);
         return shader;
     }
 

@@ -5,16 +5,14 @@
  * found in the LICENSE file.
  */
 
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkCanvas.h"
 #include "SkGraphics.h"
 #include "SkPaint.h"
 #include "SkRandom.h"
 #include "SkString.h"
 
-extern bool gSkSuppressFontCachePurgeSpew;
-
-class FontScalerBench : public SkBenchmark {
+class FontScalerBench : public Benchmark {
     SkString fName;
     SkString fText;
     bool     fDoLCD;
@@ -32,9 +30,6 @@ protected:
         this->setupPaint(&paint);
         paint.setLCDRenderText(fDoLCD);
 
-        bool prev = gSkSuppressFontCachePurgeSpew;
-        gSkSuppressFontCachePurgeSpew = true;
-
         for (int i = 0; i < loops; i++) {
             // this is critical - we want to time the creation process, so we
             // explicitly flush our cache before each run
@@ -46,11 +41,9 @@ protected:
                         0, SkIntToScalar(20), paint);
             }
         }
-
-        gSkSuppressFontCachePurgeSpew = prev;
     }
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

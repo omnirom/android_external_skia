@@ -50,7 +50,10 @@ static const SkDLine noIntersect[][2] = {
 static const size_t noIntersect_count = SK_ARRAY_COUNT(noIntersect);
 
 static const SkDLine coincidentTests[][2] = {
-   {{{{0,482.5}, {-4.4408921e-016,682.5}}},
+   {{{ { 10105, 2510 }, { 10123, 2509.98999f } }},
+    {{{10105, 2509.98999f}, { 10123, 2510 } }}},
+
+   {{ { { 0, 482.5 }, { -4.4408921e-016, 682.5 } } },
     {{{0,683}, {0,482}}}},
 
    {{{{1.77635684e-015,312}, {-1.24344979e-014,348}}},
@@ -76,9 +79,12 @@ static void check_results(skiatest::Reporter* reporter, const SkDLine& line1, co
     for (int i = 0; i < ts.used(); ++i) {
         SkDPoint result1 = line1.ptAtT(ts[0][i]);
         SkDPoint result2 = line2.ptAtT(ts[1][i]);
-        if (!result1.approximatelyEqual(result2)) {
+        if (!result1.approximatelyEqual(result2) && !ts.nearlySame(i)) {
             REPORTER_ASSERT(reporter, ts.used() != 1);
             result2 = line2.ptAtT(ts[1][i ^ 1]);
+            if (!result1.approximatelyEqual(result2)) {
+                SkDebugf(".");
+            }
             REPORTER_ASSERT(reporter, result1.approximatelyEqual(result2));
             REPORTER_ASSERT(reporter, result1.approximatelyEqual(ts.pt(i).asSkPoint()));
         }
@@ -178,7 +184,7 @@ static void testOneCoincident(skiatest::Reporter* reporter, const SkDLine& line1
     reporter->bumpTestCount();
 }
 
-static void PathOpsLineIntersectionTest(skiatest::Reporter* reporter) {
+DEF_TEST(PathOpsLineIntersection, reporter) {
     size_t index;
     for (index = 0; index < coincidentTests_count; ++index) {
         const SkDLine& line1 = coincidentTests[index][0];
@@ -201,24 +207,17 @@ static void PathOpsLineIntersectionTest(skiatest::Reporter* reporter) {
     }
 }
 
-static void PathOpsLineIntersectionOneOffTest(skiatest::Reporter* reporter) {
+DEF_TEST(PathOpsLineIntersectionOneOff, reporter) {
     int index = 0;
     SkASSERT(index < (int) tests_count);
     testOne(reporter, tests[index][0], tests[index][1]);
     testOne(reporter, tests[1][0], tests[1][1]);
 }
 
-static void PathOpsLineIntersectionOneCoincidentTest(skiatest::Reporter* reporter) {
+DEF_TEST(PathOpsLineIntersectionOneCoincident, reporter) {
     int index = 0;
     SkASSERT(index < (int) coincidentTests_count);
     const SkDLine& line1 = coincidentTests[index][0];
     const SkDLine& line2 = coincidentTests[index][1];
     testOneCoincident(reporter, line1, line2);
 }
-
-#include "TestClassDef.h"
-DEFINE_TESTCLASS_SHORT(PathOpsLineIntersectionTest)
-
-DEFINE_TESTCLASS_SHORT(PathOpsLineIntersectionOneOffTest)
-
-DEFINE_TESTCLASS_SHORT(PathOpsLineIntersectionOneCoincidentTest)

@@ -22,11 +22,15 @@ protected:
         const char* fName2;
     };
 
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     SkString onShortName() {
         return SkString("degeneratesegments");
     }
 
-    SkISize onISize() { return make_isize(896, 930); }
+    SkISize onISize() { return SkISize::Make(896, 930); }
 
     typedef SkPoint (*AddSegmentFunc)(SkPath&, SkPoint&);
 

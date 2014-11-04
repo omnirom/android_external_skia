@@ -3,10 +3,13 @@
  *
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
+ *
+ * TODO(epoger): Combine this with tools/image_expectations.cpp, or eliminate one of the two.
  */
 
 #include "gm_expectations.h"
 #include "SkBitmapHasher.h"
+#include "SkData.h"
 #include "SkImageDecoder.h"
 
 #define DEBUGFAIL_SEE_STDERR SkDEBUGFAIL("see stderr for message")
@@ -27,18 +30,6 @@ const static char kJsonKey_Hashtype_Bitmap_64bitMD5[]  = "bitmap-64bitMD5";
 
 
 namespace skiagm {
-    void gm_fprintf(FILE *stream, const char format[], ...) {
-        va_list args;
-        va_start(args, format);
-        fprintf(stream, "GM: ");
-        vfprintf(stream, format, args);
-#ifdef SK_BUILD_FOR_WIN
-        if (stderr == stream || stdout == stream) {
-            fflush(stream);
-        }
-#endif
-        va_end(args);
-    }
 
     Json::Value CreateJsonTree(Json::Value expectedResults,
                                Json::Value actualResultsFailed,
@@ -56,7 +47,6 @@ namespace skiagm {
         return root;
     }
 
-
     // GmResultDigest class...
 
     GmResultDigest::GmResultDigest(const SkBitmap &bitmap) {
@@ -66,21 +56,20 @@ namespace skiagm {
     GmResultDigest::GmResultDigest(const Json::Value &jsonTypeValuePair) {
         fIsValid = false;
         if (!jsonTypeValuePair.isArray()) {
-            gm_fprintf(stderr, "found non-array json value when parsing GmResultDigest: %s\n",
-                       jsonTypeValuePair.toStyledString().c_str());
+            SkDebugf("found non-array json value when parsing GmResultDigest: %s\n",
+                     jsonTypeValuePair.toStyledString().c_str());
             DEBUGFAIL_SEE_STDERR;
         } else if (2 != jsonTypeValuePair.size()) {
-            gm_fprintf(stderr, "found json array with wrong size when parsing GmResultDigest: %s\n",
-                       jsonTypeValuePair.toStyledString().c_str());
+            SkDebugf("found json array with wrong size when parsing GmResultDigest: %s\n",
+                     jsonTypeValuePair.toStyledString().c_str());
             DEBUGFAIL_SEE_STDERR;
         } else {
             // TODO(epoger): The current implementation assumes that the
             // result digest is always of type kJsonKey_Hashtype_Bitmap_64bitMD5
             Json::Value jsonHashValue = jsonTypeValuePair[1];
             if (!jsonHashValue.isIntegral()) {
-                gm_fprintf(stderr,
-                           "found non-integer jsonHashValue when parsing GmResultDigest: %s\n",
-                           jsonTypeValuePair.toStyledString().c_str());
+                SkDebugf("found non-integer jsonHashValue when parsing GmResultDigest: %s\n",
+                         jsonTypeValuePair.toStyledString().c_str());
                 DEBUGFAIL_SEE_STDERR;
             } else {
                 fHashDigest = jsonHashValue.asUInt64();
@@ -153,10 +142,9 @@ namespace skiagm {
             if (ignoreFailure.isNull()) {
                 fIgnoreFailure = kDefaultIgnoreFailure;
             } else if (!ignoreFailure.isBool()) {
-                gm_fprintf(stderr, "found non-boolean json value"
-                           " for key '%s' in element '%s'\n",
-                           kJsonKey_ExpectedResults_IgnoreFailure,
-                           jsonElement.toStyledString().c_str());
+                SkDebugf("found non-boolean json value for key '%s' in element '%s'\n",
+                         kJsonKey_ExpectedResults_IgnoreFailure,
+                         jsonElement.toStyledString().c_str());
                 DEBUGFAIL_SEE_STDERR;
                 fIgnoreFailure = kDefaultIgnoreFailure;
             } else {
@@ -167,10 +155,9 @@ namespace skiagm {
             if (allowedDigests.isNull()) {
                 // ok, we'll just assume there aren't any AllowedDigests to compare against
             } else if (!allowedDigests.isArray()) {
-                gm_fprintf(stderr, "found non-array json value"
-                           " for key '%s' in element '%s'\n",
-                           kJsonKey_ExpectedResults_AllowedDigests,
-                           jsonElement.toStyledString().c_str());
+                SkDebugf("found non-array json value for key '%s' in element '%s'\n",
+                         kJsonKey_ExpectedResults_AllowedDigests,
+                         jsonElement.toStyledString().c_str());
                 DEBUGFAIL_SEE_STDERR;
             } else {
                 for (Json::ArrayIndex i=0; i<allowedDigests.size(); i++) {
@@ -204,17 +191,14 @@ namespace skiagm {
         return jsonExpectations;
     }
 
-
     // IndividualImageExpectationsSource class...
 
     Expectations IndividualImageExpectationsSource::get(const char *testName) const {
         SkString path = SkOSPath::SkPathJoin(fRootDir.c_str(), testName);
         SkBitmap referenceBitmap;
         bool decodedReferenceBitmap =
-            SkImageDecoder::DecodeFile(path.c_str(), &referenceBitmap,
-                                       SkBitmap::kARGB_8888_Config,
-                                       SkImageDecoder::kDecodePixels_Mode,
-                                       NULL);
+            SkImageDecoder::DecodeFile(path.c_str(), &referenceBitmap, kN32_SkColorType,
+                                       SkImageDecoder::kDecodePixels_Mode, NULL);
         if (decodedReferenceBitmap) {
             return Expectations(referenceBitmap);
         } else {
@@ -234,35 +218,10 @@ namespace skiagm {
         return Expectations(fJsonExpectedResults[testName]);
     }
 
-    /*static*/ SkData* JsonExpectationsSource::ReadIntoSkData(SkStream &stream, size_t maxBytes) {
-        if (0 == maxBytes) {
-            return SkData::NewEmpty();
-        }
-        char* bufStart = reinterpret_cast<char *>(sk_malloc_throw(maxBytes));
-        char* bufPtr = bufStart;
-        size_t bytesRemaining = maxBytes;
-        while (bytesRemaining > 0) {
-            size_t bytesReadThisTime = stream.read(bufPtr, bytesRemaining);
-            if (0 == bytesReadThisTime) {
-                break;
-            }
-            bytesRemaining -= bytesReadThisTime;
-            bufPtr += bytesReadThisTime;
-        }
-        return SkData::NewFromMalloc(bufStart, maxBytes - bytesRemaining);
-    }
-
     /*static*/ bool JsonExpectationsSource::Parse(const char *jsonPath, Json::Value *jsonRoot) {
-        SkFILEStream inFile(jsonPath);
-        if (!inFile.isValid()) {
-            gm_fprintf(stderr, "unable to read JSON file %s\n", jsonPath);
-            DEBUGFAIL_SEE_STDERR;
-            return false;
-        }
-
-        SkAutoDataUnref dataRef(ReadFileIntoSkData(inFile));
+        SkAutoDataUnref dataRef(SkData::NewFromFileName(jsonPath));
         if (NULL == dataRef.get()) {
-            gm_fprintf(stderr, "error reading JSON file %s\n", jsonPath);
+            SkDebugf("error reading JSON file %s\n", jsonPath);
             DEBUGFAIL_SEE_STDERR;
             return false;
         }
@@ -271,11 +230,10 @@ namespace skiagm {
         size_t size = dataRef.get()->size();
         Json::Reader reader;
         if (!reader.parse(bytes, bytes+size, *jsonRoot)) {
-            gm_fprintf(stderr, "error parsing JSON file %s\n", jsonPath);
+            SkDebugf("error parsing JSON file %s\n", jsonPath);
             DEBUGFAIL_SEE_STDERR;
             return false;
         }
         return true;
     }
-
 }

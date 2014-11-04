@@ -6,6 +6,8 @@
  */
 
 #include "gm.h"
+
+#include "Resources.h"
 #include "SkCanvas.h"
 #include "SkImageDecoder.h"
 #include "SkOSFile.h"
@@ -25,22 +27,21 @@ protected:
     }
 
     virtual SkISize onISize() {
-        return make_isize(1024, 512);
+        return SkISize::Make(1024, 512);
     }
 
     virtual void onDraw(SkCanvas* canvas) {
         SkBitmap bm, bm4444;
-        SkString filename = SkOSPath::SkPathJoin(
-                INHERITED::gResourcePath.c_str(), "mandrill_512.png");
-        if (!SkImageDecoder::DecodeFile(filename.c_str(), &bm,
-                                        SkBitmap::kARGB_8888_Config,
+        SkString resourcePath = GetResourcePath();
+        SkString filename = SkOSPath::SkPathJoin(resourcePath.c_str(), "mandrill_512.png");
+        if (!SkImageDecoder::DecodeFile(filename.c_str(), &bm, kN32_SkColorType,
                                         SkImageDecoder::kDecodePixels_Mode)) {
             SkDebugf("Could not decode the file. Did you forget to set the "
                      "resourcePath?\n");
             return;
         }
         canvas->drawBitmap(bm, 0, 0);
-        SkAssertResult(bm.copyTo(&bm4444, SkBitmap::kARGB_4444_Config));
+        SkAssertResult(bm.copyTo(&bm4444, kARGB_4444_SkColorType));
         canvas->drawBitmap(bm4444, SkIntToScalar(bm.width()), 0);
     }
 

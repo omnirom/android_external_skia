@@ -6,11 +6,12 @@
  */
 
 #include "gm.h"
-#include "SkGradientShader.h"
 
-#include "SkTypeface.h"
+#include "Resources.h"
+#include "SkGradientShader.h"
 #include "SkImageDecoder.h"
 #include "SkStream.h"
+#include "SkTypeface.h"
 
 static void setTypeface(SkPaint* paint, const char name[], SkTypeface::Style style) {
     SkSafeUnref(paint->setTypeface(SkTypeface::CreateFromName(name, style)));
@@ -23,8 +24,7 @@ static SkSize computeSize(const SkBitmap& bm, const SkMatrix& mat) {
     return SkSize::Make(bounds.width(), bounds.height());
 }
 
-static void draw_col(SkCanvas* canvas, const SkBitmap& bm, const SkMatrix& mat,
-                     SkScalar dx) {
+static void draw_row(SkCanvas* canvas, const SkBitmap& bm, const SkMatrix& mat, SkScalar dx) {
     SkPaint paint;
 
     SkAutoCanvasRestore acr(canvas, true);
@@ -32,6 +32,10 @@ static void draw_col(SkCanvas* canvas, const SkBitmap& bm, const SkMatrix& mat,
     canvas->drawBitmapMatrix(bm, mat, &paint);
 
     paint.setFilterLevel(SkPaint::kLow_FilterLevel);
+    canvas->translate(dx, 0);
+    canvas->drawBitmapMatrix(bm, mat, &paint);
+
+    paint.setFilterLevel(SkPaint::kMedium_FilterLevel);
     canvas->translate(dx, 0);
     canvas->drawBitmapMatrix(bm, mat, &paint);
 
@@ -43,20 +47,23 @@ static void draw_col(SkCanvas* canvas, const SkBitmap& bm, const SkMatrix& mat,
 class FilterBitmapGM : public skiagm::GM {
     void onOnceBeforeDraw() {
 
-        make_bitmap();
+        this->makeBitmap();
 
         SkScalar cx = SkScalarHalf(fBM.width());
         SkScalar cy = SkScalarHalf(fBM.height());
-        SkScalar scale = get_scale();
+        SkScalar scale = this->getScale();
 
-
+        // these two matrices use a scale factor configured by the subclass
         fMatrix[0].setScale(scale, scale);
         fMatrix[1].setRotate(30, cx, cy); fMatrix[1].postScale(scale, scale);
+
+        // up/down scaling mix
+        fMatrix[2].setScale(0.7f, 1.05f);
     }
 
 public:
     SkBitmap    fBM;
-    SkMatrix    fMatrix[2];
+    SkMatrix    fMatrix[3];
     SkString    fName;
 
     FilterBitmapGM()
@@ -65,16 +72,20 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() SK_OVERRIDE {
         return fName;
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        return SkISize::Make(920, 480);
+        return SkISize::Make(1024, 768);
     }
 
-    virtual void make_bitmap() = 0;
-    virtual SkScalar get_scale() = 0;
+    virtual void makeBitmap() = 0;
+    virtual SkScalar getScale() = 0;
 
     virtual void onDraw(SkCanvas* canvas) SK_OVERRIDE {
 
@@ -84,7 +95,7 @@ protected:
             size.fWidth += 20;
             size.fHeight += 20;
 
-            draw_col(canvas, fBM, fMatrix[i], size.fWidth);
+            draw_row(canvas, fBM, fMatrix[i], size.fWidth);
             canvas->translate(0, size.fHeight);
         }
     }
@@ -104,13 +115,12 @@ class FilterBitmapTextGM: public FilterBitmapGM {
   protected:
       float fTextSize;
 
-      SkScalar get_scale() SK_OVERRIDE {
+      SkScalar getScale() SK_OVERRIDE {
           return 32.f/fTextSize;
       }
 
-      void make_bitmap() SK_OVERRIDE {
-          fBM.setConfig(SkBitmap::kARGB_8888_Config, int(fTextSize * 8), int(fTextSize * 6));
-          fBM.allocPixels();
+      void makeBitmap() SK_OVERRIDE {
+          fBM.allocN32Pixels(int(fTextSize * 8), int(fTextSize * 6));
           SkCanvas canvas(fBM);
           canvas.drawColor(SK_ColorWHITE);
 
@@ -144,14 +154,12 @@ class FilterBitmapCheckerboardGM: public FilterBitmapGM {
       int fSize;
       int fNumChecks;
 
-      SkScalar get_scale() SK_OVERRIDE {
+      SkScalar getScale() SK_OVERRIDE {
           return 192.f/fSize;
       }
 
-      void make_bitmap() SK_OVERRIDE {
-          fBM.setConfig(SkBitmap::kARGB_8888_Config, fSize, fSize);
-          fBM.allocPixels();
-          SkAutoLockPixels lock(fBM);
+      void makeBitmap() SK_OVERRIDE {
+          fBM.allocN32Pixels(fSize, fSize);
           for (int y = 0; y < fSize; y ++) {
               for (int x = 0; x < fSize; x ++) {
                   SkPMColor* s = fBM.getAddr32(x, y);
@@ -181,28 +189,26 @@ class FilterBitmapImageGM: public FilterBitmapGM {
       SkString fFilename;
       int fSize;
 
-      SkScalar get_scale() SK_OVERRIDE {
+      SkScalar getScale() SK_OVERRIDE {
           return 192.f/fSize;
       }
 
-      void make_bitmap() SK_OVERRIDE {
-          SkString path(skiagm::GM::gResourcePath);
-          path.append("/");
-          path.append(fFilename);
+      void makeBitmap() SK_OVERRIDE {
+          SkString resourcePath = GetResourcePath();
+          resourcePath.append("/");
+          resourcePath.append(fFilename);
 
-          SkImageDecoder *codec = NULL;
-          SkFILEStream stream(path.c_str());
+          SkImageDecoder* codec = NULL;
+          SkFILEStream stream(resourcePath.c_str());
           if (stream.isValid()) {
               codec = SkImageDecoder::Factory(&stream);
           }
           if (codec) {
               stream.rewind();
-              codec->decode(&stream, &fBM, SkBitmap::kARGB_8888_Config,
-                  SkImageDecoder::kDecodePixels_Mode);
+              codec->decode(&stream, &fBM, kN32_SkColorType, SkImageDecoder::kDecodePixels_Mode);
               SkDELETE(codec);
           } else {
-              fBM.setConfig(SkBitmap::kARGB_8888_Config, 1, 1);
-              fBM.allocPixels();
+              fBM.allocN32Pixels(1, 1);
               *(fBM.getAddr32(0,0)) = 0xFF0000FF; // red == bad
           }
           fSize = fBM.height();

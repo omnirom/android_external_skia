@@ -1,12 +1,16 @@
 #include "DMWriteTask.h"
 
 #include "DMUtil.h"
+#include "SkColorPriv.h"
 #include "SkCommandLineFlags.h"
-#include "SkImageDecoder.h"
 #include "SkImageEncoder.h"
+#include "SkMallocPixelRef.h"
+#include "SkStream.h"
 #include "SkString.h"
 
 DEFINE_string2(writePath, w, "", "If set, write GMs here as .pngs.");
+DEFINE_bool(writePngOnly, false, "If true, don't encode raw bitmap after .png data.  "
+                                 "This means -r won't work, but skdiff will still work fine.");
 
 namespace DM {
 
@@ -24,18 +28,104 @@ static int split_suffixes(int N, const char* name, SkTArray<SkString>* out) {
     return consumed;
 }
 
-WriteTask::WriteTask(const Task& parent, SkBitmap bitmap) : Task(parent), fBitmap(bitmap) {
+inline static SkString find_gm_name(const Task& parent, SkTArray<SkString>* suffixList) {
     const int suffixes = parent.depth() + 1;
     const SkString& name = parent.name();
-    const int totalSuffixLength = split_suffixes(suffixes, name.c_str(), &fSuffixes);
-    fGmName.set(name.c_str(), name.size()-totalSuffixLength);
+    const int totalSuffixLength = split_suffixes(suffixes, name.c_str(), suffixList);
+    return SkString(name.c_str(), name.size() - totalSuffixLength);
 }
+
+WriteTask::WriteTask(const Task& parent, SkBitmap bitmap)
+    : CpuTask(parent)
+    , fGmName(find_gm_name(parent, &fSuffixes))
+    , fBitmap(bitmap)
+    , fData(NULL)
+    , fExtension(".png") {}
+
+WriteTask::WriteTask(const Task& parent, SkData *data, const char* ext)
+    : CpuTask(parent)
+    , fGmName(find_gm_name(parent, &fSuffixes))
+    , fData(SkRef(data))
+    , fExtension(ext) {}
 
 void WriteTask::makeDirOrFail(SkString dir) {
     if (!sk_mkdir(dir.c_str())) {
         this->fail();
     }
 }
+
+namespace {
+
+// One file that first contains a .png of an SkBitmap, then its raw pixels.
+// We use this custom format to avoid premultiplied/unpremultiplied pixel conversions.
+struct PngAndRaw {
+    static bool Encode(SkBitmap bitmap, const char* path) {
+        SkFILEWStream stream(path);
+        if (!stream.isValid()) {
+            SkDebugf("Can't write %s.\n", path);
+            return false;
+        }
+
+        // Write a PNG first for humans and other tools to look at.
+        if (!SkImageEncoder::EncodeStream(&stream, bitmap, SkImageEncoder::kPNG_Type, 100)) {
+            SkDebugf("Can't encode a PNG.\n");
+            return false;
+        }
+        if (FLAGS_writePngOnly) {
+            return true;
+        }
+
+        // Pad out so the raw pixels start 4-byte aligned.
+        const uint32_t maxPadding = 0;
+        const size_t pos = stream.bytesWritten();
+        stream.write(&maxPadding, SkAlign4(pos) - pos);
+
+        // Then write our secret raw pixels that only DM reads.
+        SkAutoLockPixels lock(bitmap);
+        return stream.write(bitmap.getPixels(), bitmap.getSize());
+    }
+
+    // This assumes bitmap already has allocated pixels of the correct size.
+    static bool Decode(const char* path, SkImageInfo info, SkBitmap* bitmap) {
+        SkAutoTUnref<SkData> data(SkData::NewFromFileName(path));
+        if (!data) {
+            SkDebugf("Can't read %s.\n", path);
+            return false;
+        }
+
+        // The raw pixels are at the end of the file.  We'll skip the encoded PNG at the front.
+        const size_t rowBytes = info.minRowBytes();  // Assume densely packed.
+        const size_t bitmapBytes = info.getSafeSize(rowBytes);
+        if (data->size() < bitmapBytes) {
+            SkDebugf("%s is too small to contain the bitmap we're looking for.\n", path);
+            return false;
+        }
+
+        const size_t offset = data->size() - bitmapBytes;
+        SkAutoTUnref<SkData> subset(
+                SkData::NewSubset(data, offset, bitmapBytes));
+        SkAutoTUnref<SkPixelRef> pixels(
+            SkMallocPixelRef::NewWithData(
+                    info, rowBytes, NULL/*ctable*/, subset));
+        SkASSERT(pixels);
+
+        bitmap->setInfo(info, rowBytes);
+        bitmap->setPixelRef(pixels);
+        return true;
+    }
+};
+
+// Does not take ownership of data.
+bool save_data_to_file(const SkData* data, const char* path) {
+    SkFILEWStream stream(path);
+    if (!stream.isValid() || !stream.write(data->data(), data->size())) {
+        SkDebugf("Can't write %s.\n", path);
+        return false;
+    }
+    return true;
+}
+
+}  // namespace
 
 void WriteTask::draw() {
     SkString dir(FLAGS_writePath[0]);
@@ -44,12 +134,13 @@ void WriteTask::draw() {
         dir = SkOSPath::SkPathJoin(dir.c_str(), fSuffixes[i].c_str());
         this->makeDirOrFail(dir);
     }
+
     SkString path = SkOSPath::SkPathJoin(dir.c_str(), fGmName.c_str());
-    path.append(".png");
-    if (!SkImageEncoder::EncodeFile(path.c_str(),
-                                    fBitmap,
-                                    SkImageEncoder::kPNG_Type,
-                                    100/*quality*/)) {
+    path.append(fExtension);
+
+    const bool ok = fData.get() ? save_data_to_file(fData,   path.c_str())
+                                : PngAndRaw::Encode(fBitmap, path.c_str());
+    if (!ok) {
         this->fail();
     }
 }
@@ -83,28 +174,22 @@ static SkString path_to_expected_image(const char* root, const Task& task) {
     filename.remove(filename.size() - suffixLength, suffixLength);
     filename.append(".png");
 
-    //SkDebugf("dir %s, filename %s\n", dir.c_str(), filename.c_str());
-
     return SkOSPath::SkPathJoin(dir.c_str(), filename.c_str());
 }
 
 bool WriteTask::Expectations::check(const Task& task, SkBitmap bitmap) const {
-    const SkString path = path_to_expected_image(fRoot, task);
-
-    SkBitmap expected;
-    if (SkImageDecoder::DecodeFile(path.c_str(), &expected)) {
-        if (expected.config() != bitmap.config()) {
-            SkBitmap converted;
-            SkAssertResult(expected.copyTo(&converted, bitmap.config()));
-            expected.swap(converted);
-        }
-        SkASSERT(expected.config() == bitmap.config());
-        return BitmapsEqual(expected, bitmap);
+    if (!FLAGS_writePath.isEmpty() && 0 == strcmp(FLAGS_writePath[0], fRoot)) {
+        SkDebugf("We seem to be reading and writing %s concurrently.  This won't work.\n", fRoot);
+        return false;
     }
 
-    // Couldn't read the file, etc.
-    SkDebugf("Problem decoding %s to SkBitmap.\n", path.c_str());
-    return false;
+    const SkString path = path_to_expected_image(fRoot, task);
+    SkBitmap expected;
+    if (!PngAndRaw::Decode(path.c_str(), bitmap.info(), &expected)) {
+        return false;
+    }
+
+    return BitmapsEqual(expected, bitmap);
 }
 
 }  // namespace DM

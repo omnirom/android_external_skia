@@ -4,11 +4,12 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkCanvas.h"
 #include "SkColor.h"
 #include "SkPaint.h"
 #include "SkPicture.h"
+#include "SkPictureRecorder.h"
 #include "SkPoint.h"
 #include "SkRect.h"
 #include "SkString.h"
@@ -16,7 +17,7 @@
 // This is designed to emulate about 4 screens of textual content
 
 
-class PicturePlaybackBench : public SkBenchmark {
+class PicturePlaybackBench : public Benchmark {
 public:
     PicturePlaybackBench(const char name[])  {
         fName.printf("picture_playback_%s", name);
@@ -37,16 +38,15 @@ protected:
 
     virtual void onDraw(const int loops, SkCanvas* canvas) {
 
-        SkPicture picture;
-
-        SkCanvas* pCanvas = picture.beginRecording(PICTURE_WIDTH, PICTURE_HEIGHT);
-        recordCanvas(pCanvas);
-        picture.endRecording();
+        SkPictureRecorder recorder;
+        SkCanvas* pCanvas = recorder.beginRecording(PICTURE_WIDTH, PICTURE_HEIGHT, NULL, 0);
+        this->recordCanvas(pCanvas);
+        SkAutoTUnref<SkPicture> picture(recorder.endRecording());
 
         const SkPoint translateDelta = getTranslateDelta(loops);
 
         for (int i = 0; i < loops; i++) {
-            picture.draw(canvas);
+            picture->draw(canvas);
             canvas->translate(translateDelta.fX, translateDelta.fY);
         }
     }
@@ -63,7 +63,7 @@ protected:
     SkScalar fPictureHeight;
     SkScalar fTextSize;
 private:
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 
@@ -71,7 +71,7 @@ class TextPlaybackBench : public PicturePlaybackBench {
 public:
     TextPlaybackBench() : INHERITED("drawText") { }
 protected:
-    virtual void recordCanvas(SkCanvas* canvas) {
+    virtual void recordCanvas(SkCanvas* canvas) SK_OVERRIDE {
         SkPaint paint;
         paint.setTextSize(fTextSize);
         paint.setColor(SK_ColorBLACK);
@@ -96,7 +96,7 @@ public:
         : INHERITED(drawPosH ? "drawPosTextH" : "drawPosText")
         , fDrawPosH(drawPosH) { }
 protected:
-    virtual void recordCanvas(SkCanvas* canvas) {
+    virtual void recordCanvas(SkCanvas* canvas) SK_OVERRIDE {
         SkPaint paint;
         paint.setTextSize(fTextSize);
         paint.setColor(SK_ColorBLACK);

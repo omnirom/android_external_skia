@@ -9,9 +9,9 @@
 #include "SkRandom.h"
 #include "SkTArray.h"
 
-class SkOnce : SkNoncopyable {
+class SkDoOnce : SkNoncopyable {
 public:
-    SkOnce() { fDidOnce = false; }
+    SkDoOnce() { fDidOnce = false; }
 
     bool needToDo() const { return !fDidOnce; }
     bool alreadyDone() const { return fDidOnce; }
@@ -27,20 +27,24 @@ private:
 namespace skiagm {
 
 class ConvexPathsGM : public GM {
-    SkOnce fOnce;
+    SkDoOnce fOnce;
 public:
     ConvexPathsGM() {
         this->setBGColor(0xFF000000);
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() {
         return SkString("convexpaths");
     }
 
 
     virtual SkISize onISize() {
-        return make_isize(1200, 1100);
+        return SkISize::Make(1200, 1100);
     }
 
     void makePaths() {

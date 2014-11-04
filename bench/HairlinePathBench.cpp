@@ -4,12 +4,18 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "SkBenchmark.h"
+
+#include "Benchmark.h"
 #include "SkCanvas.h"
 #include "SkPaint.h"
 #include "SkRandom.h"
 #include "SkShader.h"
 #include "SkString.h"
+
+#if SK_SUPPORT_GPU
+#include "GrDrawTargetCaps.h"
+#include "GrTest.h"
+#endif
 
 enum Flags {
     kBig_Flag = 1 << 0,
@@ -30,7 +36,7 @@ static const int points[] = {
 
 static const int kMaxPathSize = 10;
 
-class HairlinePathBench : public SkBenchmark {
+class HairlinePathBench : public Benchmark {
 public:
     HairlinePathBench(Flags flags) : fFlags(flags) {
         fPaint.setStyle(SkPaint::kStroke_Style);
@@ -72,7 +78,7 @@ private:
     SkPaint     fPaint;
     SkString    fName;
     Flags       fFlags;
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 class LinePathBench : public HairlinePathBench {
@@ -170,6 +176,22 @@ public:
                          weight);
         }
     }
+
+    virtual void onDraw(const int loops, SkCanvas* canvas) SK_OVERRIDE {
+#if SK_SUPPORT_GPU
+        GrContext* context = canvas->getGrContext();
+        // This is a workaround for skbug.com/2078. See also skbug.com/2033.
+        if (NULL != context) {
+            GrTestTarget tt;
+            context->getTestTarget(&tt);
+            if (tt.target()->caps()->pathRenderingSupport()) {
+                return;
+            }
+        }
+#endif
+        INHERITED::onDraw(loops, canvas);
+    }
+
 private:
     typedef HairlinePathBench INHERITED;
 };

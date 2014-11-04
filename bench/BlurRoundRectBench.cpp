@@ -5,7 +5,7 @@
 * found in the LICENSE file.
 */
 
-#include "SkBenchmark.h"
+#include "Benchmark.h"
 #include "SkBlurMask.h"
 #include "SkBlurMaskFilter.h"
 #include "SkCanvas.h"
@@ -14,14 +14,14 @@
 #include "SkPaint.h"
 #include "SkPath.h"
 #include "SkPoint.h"
-#include "SkRect.h"
 #include "SkRRect.h"
+#include "SkRect.h"
 #include "SkString.h"
 #include "SkXfermode.h"
 
 // Large blurred RR appear frequently on web pages. This benchmark measures our
 // performance in this case.
-class BlurRoundRectBench : public SkBenchmark {
+class BlurRoundRectBench : public Benchmark {
 public:
     BlurRoundRectBench(int width, int height, int cornerRadius)
         : fName("blurroundrect") {
@@ -40,18 +40,17 @@ public:
     }
 
     virtual void onDraw(const int loops, SkCanvas* canvas) SK_OVERRIDE {
-        SkLayerDrawLooper* looper = new SkLayerDrawLooper;
+        SkLayerDrawLooper::Builder looperBuilder;
         {
             SkLayerDrawLooper::LayerInfo info;
-            info.fFlagsMask = 0;
             info.fPaintBits = SkLayerDrawLooper::kMaskFilter_Bit
                               | SkLayerDrawLooper::kColorFilter_Bit;
             info.fColorMode = SkXfermode::kSrc_Mode;
             info.fOffset = SkPoint::Make(SkIntToScalar(-1), SkIntToScalar(0));
             info.fPostTranslate = false;
-            SkPaint* paint = looper->addLayerOnTop(info);
+            SkPaint* paint = looperBuilder.addLayerOnTop(info);
             SkMaskFilter* maskFilter = SkBlurMaskFilter::Create(
-                    SkBlurMaskFilter::kNormal_BlurStyle,
+                    kNormal_SkBlurStyle,
                     SkBlurMask::ConvertRadiusToSigma(SK_ScalarHalf),
                     SkBlurMaskFilter::kHighQuality_BlurFlag);
             paint->setMaskFilter(maskFilter)->unref();
@@ -62,13 +61,13 @@ public:
         }
         {
             SkLayerDrawLooper::LayerInfo info;
-            looper->addLayerOnTop(info);
+            looperBuilder.addLayerOnTop(info);
         }
         SkPaint dullPaint;
         dullPaint.setAntiAlias(true);
 
         SkPaint loopedPaint;
-        loopedPaint.setLooper(looper)->unref();
+        loopedPaint.setLooper(looperBuilder.detachLooper())->unref();
         loopedPaint.setAntiAlias(true);
         loopedPaint.setColor(SK_ColorCYAN);
 
@@ -82,7 +81,7 @@ private:
     SkString    fName;
     SkRRect     fRRect;
 
-    typedef     SkBenchmark INHERITED;
+    typedef     Benchmark INHERITED;
 };
 
 // Create one with dimensions/rounded corners based on the skp

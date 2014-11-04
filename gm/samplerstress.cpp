@@ -28,12 +28,16 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() {
         return SkString("samplerstress");
     }
 
     virtual SkISize onISize() {
-        return make_isize(640, 480);
+        return SkISize::Make(640, 480);
     }
 
     /**
@@ -47,13 +51,7 @@ protected:
         static const int xSize = 16;
         static const int ySize = 16;
 
-        fTexture.setConfig(SkBitmap::kARGB_8888_Config,
-                           xSize,
-                           ySize,
-                           xSize*sizeof(SkColor));
-
-        fTexture.allocPixels();
-        fTexture.lockPixels();
+        fTexture.allocN32Pixels(xSize, ySize);
         SkPMColor* addr = fTexture.getAddr32(0, 0);
 
         for (int y = 0; y < ySize; ++y) {
@@ -68,8 +66,6 @@ protected:
                 }
             }
         }
-
-        fTexture.unlockPixels();
 
         fTextureCreated = true;
     }
@@ -91,7 +87,7 @@ protected:
             return;
         }
 
-        fMaskFilter.reset(SkNEW(SkStippleMaskFilter));
+        fMaskFilter.reset(SkStippleMaskFilter::Create());
     }
 
     virtual void onDraw(SkCanvas* canvas) {

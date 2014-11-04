@@ -20,12 +20,16 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() SK_OVERRIDE {
         return SkString("arcofzorro");
     }
 
     virtual SkISize onISize() SK_OVERRIDE {
-        return make_isize(1000, 1000);
+        return SkISize::Make(1000, 1000);
     }
 
     virtual void onDraw(SkCanvas* canvas) SK_OVERRIDE {

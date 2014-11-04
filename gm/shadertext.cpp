@@ -1,20 +1,18 @@
-
 /*
  * Copyright 2011 Google Inc.
  *
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
+
 #include "gm.h"
 #include "SkCanvas.h"
 #include "SkGradientShader.h"
-#include "SkUnitMappers.h"
 
 namespace skiagm {
 
-static void makebm(SkBitmap* bm, SkBitmap::Config config, int w, int h) {
-    bm->setConfig(config, w, h);
-    bm->allocPixels();
+static void makebm(SkBitmap* bm, int w, int h) {
+    bm->allocN32Pixels(w, h);
     bm->eraseColor(SK_ColorTRANSPARENT);
 
     SkCanvas    canvas(*bm);
@@ -24,15 +22,9 @@ static void makebm(SkBitmap* bm, SkBitmap::Config config, int w, int h) {
     SkScalar    pos[] = { 0, SK_Scalar1/2, SK_Scalar1 };
     SkPaint     paint;
 
-    SkUnitMapper*   um = NULL;
-
-    um = new SkCosineMapper;
-
-    SkAutoUnref au(um);
-
     paint.setDither(true);
     paint.setShader(SkGradientShader::CreateLinear(pts, colors, pos,
-                SK_ARRAY_COUNT(colors), SkShader::kClamp_TileMode, um))->unref();
+                SK_ARRAY_COUNT(colors), SkShader::kClamp_TileMode))->unref();
     canvas.drawPaint(paint);
 }
 
@@ -40,7 +32,7 @@ static SkShader* MakeBitmapShader(SkShader::TileMode tx, SkShader::TileMode ty,
                            int w, int h) {
     static SkBitmap bmp;
     if (bmp.isNull()) {
-        makebm(&bmp, SkBitmap::kARGB_8888_Config, w/2, h/4);
+        makebm(&bmp, w/2, h/4);
     }
     return SkShader::CreateBitmapShader(bmp, tx, ty);
 }
@@ -62,32 +54,26 @@ static const GradData gGradData[] = {
     { 5, gColors, NULL },
 };
 
-static SkShader* MakeLinear(const SkPoint pts[2], const GradData& data,
-                            SkShader::TileMode tm, SkUnitMapper* mapper) {
-    return SkGradientShader::CreateLinear(pts, data.fColors, data.fPos,
-                                          data.fCount, tm, mapper);
+static SkShader* MakeLinear(const SkPoint pts[2], const GradData& data, SkShader::TileMode tm) {
+    return SkGradientShader::CreateLinear(pts, data.fColors, data.fPos, data.fCount, tm);
 }
 
-static SkShader* MakeRadial(const SkPoint pts[2], const GradData& data,
-                            SkShader::TileMode tm, SkUnitMapper* mapper) {
+static SkShader* MakeRadial(const SkPoint pts[2], const GradData& data, SkShader::TileMode tm) {
     SkPoint center;
     center.set(SkScalarAve(pts[0].fX, pts[1].fX),
                SkScalarAve(pts[0].fY, pts[1].fY));
     return SkGradientShader::CreateRadial(center, center.fX, data.fColors,
-                                          data.fPos, data.fCount, tm, mapper);
+                                          data.fPos, data.fCount, tm);
 }
 
-static SkShader* MakeSweep(const SkPoint pts[2], const GradData& data,
-                           SkShader::TileMode, SkUnitMapper* mapper) {
+static SkShader* MakeSweep(const SkPoint pts[2], const GradData& data, SkShader::TileMode) {
     SkPoint center;
     center.set(SkScalarAve(pts[0].fX, pts[1].fX),
                SkScalarAve(pts[0].fY, pts[1].fY));
-    return SkGradientShader::CreateSweep(center.fX, center.fY, data.fColors,
-                                         data.fPos, data.fCount, mapper);
+    return SkGradientShader::CreateSweep(center.fX, center.fY, data.fColors, data.fPos, data.fCount);
 }
 
-static SkShader* Make2Radial(const SkPoint pts[2], const GradData& data,
-                           SkShader::TileMode tm, SkUnitMapper* mapper) {
+static SkShader* Make2Radial(const SkPoint pts[2], const GradData& data, SkShader::TileMode tm) {
     SkPoint center0, center1;
     center0.set(SkScalarAve(pts[0].fX, pts[1].fX),
                 SkScalarAve(pts[0].fY, pts[1].fY));
@@ -96,11 +82,11 @@ static SkShader* Make2Radial(const SkPoint pts[2], const GradData& data,
     return SkGradientShader::CreateTwoPointRadial(
                             center1, (pts[1].fX - pts[0].fX) / 7,
                             center0, (pts[1].fX - pts[0].fX) / 2,
-                            data.fColors, data.fPos, data.fCount, tm, mapper);
+                            data.fColors, data.fPos, data.fCount, tm);
 }
 
-typedef SkShader* (*GradMaker)(const SkPoint pts[2], const GradData& data,
-                     SkShader::TileMode tm, SkUnitMapper* mapper);
+typedef SkShader* (*GradMaker)(const SkPoint pts[2], const GradData& data, SkShader::TileMode tm);
+
 static const GradMaker gGradMakers[] = {
     MakeLinear, MakeRadial, MakeSweep, Make2Radial
 };
@@ -114,12 +100,15 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
 
     SkString onShortName() {
         return SkString("shadertext");
     }
 
-    SkISize onISize() { return make_isize(1450, 500); }
+    SkISize onISize() { return SkISize::Make(1450, 500); }
 
     virtual void onDraw(SkCanvas* canvas) {
         const char text[] = "Shaded Text";
@@ -152,8 +141,7 @@ protected:
             for (size_t m = 0; m < SK_ARRAY_COUNT(gGradMakers); ++m) {
                 shaders[shdIdx++] = gGradMakers[m](pts,
                                                    gGradData[d],
-                                                   SkShader::kClamp_TileMode,
-                                                   NULL);
+                                                   SkShader::kClamp_TileMode);
             }
         }
         for (size_t tx = 0; tx < SK_ARRAY_COUNT(tileModes); ++tx) {
@@ -208,8 +196,6 @@ private:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef SK_BUILD_FOR_ANDROID
 static GM* MyFactory(void*) { return new ShaderTextGM; }
 static GMRegistry reg(MyFactory);
-#endif
 }

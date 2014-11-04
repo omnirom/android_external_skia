@@ -70,12 +70,16 @@ public:
     }
 
 protected:
+    virtual uint32_t onGetFlags() const SK_OVERRIDE {
+        return kSkipTiled_Flag;
+    }
+
     virtual SkString onShortName() {
         return SkString("inverse_paths");
     }
 
     virtual SkISize onISize() {
-        return make_isize(800, 900);
+        return SkISize::Make(800, 900);
     }
 
     virtual void onDraw(SkCanvas* canvas) {

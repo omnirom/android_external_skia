@@ -65,7 +65,6 @@ static void testLineIntersect(skiatest::Reporter* reporter, const SkDQuad& quad,
     REPORTER_ASSERT(reporter, found);
 }
 
-
 // find a point on a quad by choosing a t from 0 to 1
 // create a vertical span above and below the point
 // verify that intersecting the vertical span and the quad returns t
@@ -111,8 +110,7 @@ static void testQuadLineIntersectMain(PathOpsThreadState* data)
     }
 }
 
-static void PathOpsQuadLineIntersectionThreadedTest(skiatest::Reporter* reporter)
-{
+DEF_TEST(PathOpsQuadLineIntersectionThreaded, reporter) {
     int threadCount = initializeTests(reporter, "testQuadLineIntersect");
     PathOpsThreadedTestRunner testRunner(reporter, threadCount);
     for (int a = 0; a < 16; ++a) {
@@ -127,6 +125,3 @@ static void PathOpsQuadLineIntersectionThreadedTest(skiatest::Reporter* reporter
 finish:
     testRunner.render();
 }
-
-#include "TestClassDef.h"
-DEFINE_TESTCLASS_SHORT(PathOpsQuadLineIntersectionThreadedTest)

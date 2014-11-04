@@ -5,7 +5,8 @@
  * found in the LICENSE file.
  */
 
-#include "SkBenchmark.h"
+#include "Benchmark.h"
+#include "Resources.h"
 #include "SkBitmap.h"
 #include "SkData.h"
 #include "SkForceLinking.h"
@@ -18,7 +19,7 @@ __SK_FORCE_IMAGE_DECODER_LINKING;
 
 class SkCanvas;
 
-class SkipZeroesBench : public SkBenchmark {
+class SkipZeroesBench : public Benchmark {
 public:
     SkipZeroesBench(const char* filename, bool skipZeroes)
     : fName("SkipZeroes_")
@@ -45,13 +46,14 @@ protected:
     }
 
     virtual void onPreDraw() SK_OVERRIDE {
-        const char* resPath = GetResourcePath().c_str();
-        if (NULL == resPath) {
+        SkString resourcePath = GetResourcePath();
+        if (resourcePath.isEmpty()) {
             fValid = false;
             return;
         }
 
-        SkString fullPath = SkOSPath::SkPathJoin(resPath, fFilename.c_str());
+        SkString fullPath = SkOSPath::SkPathJoin(resourcePath.c_str(),
+                                                 fFilename.c_str());
         SkFILEStream fileStream(fullPath.c_str());
         fValid = fileStream.isValid() && fileStream.getLength() > 0;
         if (fValid) {
@@ -108,7 +110,7 @@ private:
     bool                            fSkipZeroes;
     bool                            fValid;
 
-    typedef SkBenchmark INHERITED;
+    typedef Benchmark INHERITED;
 };
 
 // Enable the true version once the feature is checked in.

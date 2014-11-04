@@ -5,20 +5,18 @@
  * found in the LICENSE file.
  */
 
-#include "Test.h"
-#include "TestClassDef.h"
 #include "SkCanvas.h"
-#include "SkPaint.h"
 #include "SkCubicClipper.h"
 #include "SkGeometry.h"
+#include "SkPaint.h"
+#include "Test.h"
 
 // Currently the supersampler blitter uses int16_t for its index into an array
 // the width of the clip. Test that we don't crash/assert if we try to draw
 // with a device/clip that is larger.
 static void test_giantClip() {
     SkBitmap bm;
-    bm.setConfig(SkBitmap::kARGB_8888_Config, 64919, 1);
-    bm.allocPixels();
+    bm.allocN32Pixels(64919, 1);
     SkCanvas canvas(bm);
     canvas.clear(SK_ColorTRANSPARENT);
 

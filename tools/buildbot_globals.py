@@ -8,14 +8,20 @@
 Provides read access to buildbot's global_variables.json .
 """
 
+
+import HTMLParser
 import json
+import re
+import retrieve_from_googlesource
 import svn
+import sys
+
 
 _global_vars = None
 
 
-GLOBAL_VARS_JSON_URL = (
-    'http://skia.googlecode.com/svn/buildbot/site_config/global_variables.json')
+SKIABOT_REPO = 'https://skia.googlesource.com/buildbot'
+_GLOBAL_VARS_PATH = 'site_config/global_variables.json'
 
 
 class GlobalVarsRetrievalError(Exception):
@@ -39,15 +45,23 @@ class NoSuchGlobalVariable(KeyError):
 
 
 def Get(var_name):
-  '''Return the value associated with this name in global_variables.json.
-  Raises NoSuchGlobalVariable if there is no variable with that name.'''
+  """Return the value associated with this name in global_variables.json.
+
+  Args:
+      var_name: string; the variable to look up.
+  Returns:
+      The value of the variable.
+  Raises:
+      NoSuchGlobalVariable if there is no variable with that name.
+  """
   global _global_vars
   if not _global_vars:
     try:
-      global_vars_text = svn.Cat(GLOBAL_VARS_JSON_URL)
-    except Exception:
-      raise GlobalVarsRetrievalError('Failed to retrieve %s.' %
-                                     GLOBAL_VARS_JSON_URL)
+      global_vars_text = retrieve_from_googlesource.get(SKIABOT_REPO,
+                                                        _GLOBAL_VARS_PATH)
+    except Exception as e:
+      raise GlobalVarsRetrievalError('Failed to retrieve %s from %s:\n%s' %
+                                     (_GLOBAL_VARS_PATH, SKIABOT_REPO, str(e)))
     try:
       _global_vars = json.loads(global_vars_text)
     except ValueError as e:
@@ -56,3 +70,7 @@ def Get(var_name):
     return _global_vars[var_name]['value']
   except KeyError:
     raise NoSuchGlobalVariable(var_name)
+
+
+if __name__ == '__main__':
+  print Get(sys.argv[1])
