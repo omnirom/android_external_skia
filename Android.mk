@@ -599,6 +599,10 @@ LOCAL_SRC_FILES += src/views/SkTextBox.cpp
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/include/views
 endif
 
+# The setConfig backcompat needs the legacy setConfig support
+# TODO: ifdef the backcompat setConfig function under the same ifdef
+LOCAL_CFLAGS += -DSK_SUPPORT_LEGACY_SETCONFIG
+
 # Add SFTNLY support for PDF (which in turns depends on ICU)
 LOCAL_C_INCLUDES += external/sfntly/cpp/src
 LOCAL_STATIC_LIBRARIES += libsfntly
