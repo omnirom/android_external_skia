@@ -152,11 +152,6 @@ void SkBitmap::getBounds(SkIRect* bounds) const {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-extern "C" void _ZN8SkBitmap9setConfigENS_6ConfigEiii(SkBitmap *bitmap,
-        SkBitmap::Config c, int width, int height, int rowBytes) {
-    bitmap->setConfig(c, width, height, (size_t) rowBytes);
-}
-
 static bool validate_alphaType(SkColorType colorType, SkAlphaType alphaType,
                                SkAlphaType* canonical = NULL) {
     switch (colorType) {
@@ -225,6 +220,11 @@ bool SkBitmap::setInfo(const SkImageInfo& origInfo, size_t rowBytes) {
 }
 
 #ifdef SK_SUPPORT_LEGACY_SETCONFIG
+extern "C" void _ZN8SkBitmap9setConfigENS_6ConfigEiii(SkBitmap *bitmap,
+        SkBitmap::Config c, int width, int height, int rowBytes) {
+    bitmap->setConfig(c, width, height, (size_t) rowBytes);
+}
+
 bool SkBitmap::setConfig(Config config, int width, int height, size_t rowBytes,
                          SkAlphaType alphaType) {
     SkColorType ct = SkBitmapConfigToColorType(config);
