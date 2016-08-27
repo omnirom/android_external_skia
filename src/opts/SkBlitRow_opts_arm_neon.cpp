@@ -390,7 +390,7 @@ void S32A_D565_Opaque_neon(uint16_t* SK_RESTRICT dst,
             "movi    v4.8h, #0x80                   \t\n"
 
             "1:                                     \t\n"
-            "sub     %[count], %[count], #16        \t\n"
+            "sub     %w[count], %w[count], #16      \t\n"
             "ld1     {v16.8h-v17.8h}, [%[dst]]      \t\n"
             "ld4     {v0.16b-v3.16b}, [%[src]], #64 \t\n"
             "prfm    pldl1keep, [%[src],#512]       \t\n"
@@ -416,7 +416,7 @@ void S32A_D565_Opaque_neon(uint16_t* SK_RESTRICT dst,
             "umlal   v22.8h, v3.8b, v18.8b          \t\n"
             "ushr    v20.8h, v22.8h, #5             \t\n"
             "addhn   v20.8b, v22.8h, v20.8h         \t\n"
-            "cmp     %[count], #16                  \t\n"
+            "cmp     %w[count], #16                 \t\n"
             "mov     v6.16b, v4.16b                 \t\n"
             "mov     v5.16b, v4.16b                 \t\n"
             "umlal   v6.8h, v3.8b, v16.8b           \t\n"
@@ -714,9 +714,9 @@ void S32A_D565_Blend_neon(uint16_t* SK_RESTRICT dst,
         if (sc) {
             uint16_t dc = *dst;
             unsigned dst_scale = 255 - SkMulDiv255Round(SkGetPackedA32(sc), alpha);
-            unsigned dr = SkMulS16(SkPacked32ToR16(sc), alpha) + SkMulS16(SkGetPackedR16(dc), dst_scale);
-            unsigned dg = SkMulS16(SkPacked32ToG16(sc), alpha) + SkMulS16(SkGetPackedG16(dc), dst_scale);
-            unsigned db = SkMulS16(SkPacked32ToB16(sc), alpha) + SkMulS16(SkGetPackedB16(dc), dst_scale);
+            unsigned dr = (SkPacked32ToR16(sc) * alpha) + (SkGetPackedR16(dc) * dst_scale);
+            unsigned dg = (SkPacked32ToG16(sc) * alpha) + (SkGetPackedG16(dc) * dst_scale);
+            unsigned db = (SkPacked32ToB16(sc) * alpha) + (SkGetPackedB16(dc) * dst_scale);
             *dst = SkPackRGB16(SkDiv255Round(dr), SkDiv255Round(dg), SkDiv255Round(db));
         }
         dst += 1;
@@ -1541,14 +1541,14 @@ const SkBlitRow::Proc16 sk_blitrow_platform_565_procs_arm_neon[] = {
 #if 0
     S32A_D565_Blend_neon,
 #else
-    NULL,   // https://code.google.com/p/skia/issues/detail?id=2797
+    nullptr,   // https://code.google.com/p/skia/issues/detail?id=2797
 #endif
 
     // dither
     S32_D565_Opaque_Dither_neon,
     S32_D565_Blend_Dither_neon,
     S32A_D565_Opaque_Dither_neon,
-    NULL,   // S32A_D565_Blend_Dither
+    nullptr,   // S32A_D565_Blend_Dither
 };
 
 const SkBlitRow::ColorProc16 sk_blitrow_platform_565_colorprocs_arm_neon[] = {
@@ -1559,7 +1559,7 @@ const SkBlitRow::ColorProc16 sk_blitrow_platform_565_colorprocs_arm_neon[] = {
 };
 
 const SkBlitRow::Proc32 sk_blitrow_platform_32_procs_arm_neon[] = {
-    NULL,   // S32_Opaque,
+    nullptr,   // S32_Opaque,
     S32_Blend_BlitRow32_neon,        // S32_Blend,
     /*
      * We have two choices for S32A_Opaque procs. The one reads the src alpha
@@ -1579,6 +1579,6 @@ const SkBlitRow::Proc32 sk_blitrow_platform_32_procs_arm_neon[] = {
 #ifdef SK_CPU_ARM32
     S32A_Blend_BlitRow32_neon        // S32A_Blend
 #else
-    NULL
+    nullptr
 #endif
 };
